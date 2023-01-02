@@ -22,6 +22,8 @@ isEmpty(SIGDIGGER_PREFIX) {
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    AddChanDialog.cpp \
+    AddMasterDialog.cpp \
     MultiChannelTreeModel.cpp \
     Registration.cpp \
     ZeroMQWidget.cpp \
@@ -29,6 +31,8 @@ SOURCES += \
     MultiChannelForwarder.cpp
 
 HEADERS += \
+  AddChanDialog.h \
+  AddMasterDialog.h \
   MultiChannelTreeModel.h \
   ZeroMQWidget.h \
     ZeroMQWidgetFactory.h \
@@ -49,4 +53,6 @@ unix {
 !isEmpty(target.path): INSTALLS += target
 
 FORMS += \
+  AddChanDialog.ui \
+  AddMasterDialog.ui \
   ZeroMQWidget.ui

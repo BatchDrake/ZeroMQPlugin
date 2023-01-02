@@ -72,6 +72,7 @@ ZeroMQWidget::ZeroMQWidget(
 ZeroMQWidget::~ZeroMQWidget()
 {
   delete m_ui;
+  delete m_forwarder;
 }
 
 void
