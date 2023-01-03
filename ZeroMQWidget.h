@@ -89,6 +89,8 @@ namespace SigDigger {
     void applySpectrumState();
     void connectAll();
 
+    void checkStartStop();
+
   public:
     ZeroMQWidget(ZeroMQWidgetFactory *, UIMediator *, QWidget *parent = nullptr);
     ~ZeroMQWidget() override;
@@ -122,6 +124,8 @@ namespace SigDigger {
 
     void onChangeCurrent();
     void onRemove();
+
+    void onTogglePublishing();
   };
 }
 

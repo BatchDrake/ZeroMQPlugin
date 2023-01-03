@@ -60,6 +60,18 @@ MultiChannelForwarder::deleteMaster(MasterListIterator it)
   else if (master->opening)
     pendingMasterMap.erase(master->reqId);
 
+  // Also, deleting the master implies recalculating the frequency limits
+  m_freqMin = +INFINITY;
+  m_freqMax = -INFINITY;
+
+  for (auto p : masterList) {
+    if (p->frequency - p->bandwidth / 2 < m_freqMin)
+      m_freqMin = p->frequency - p->bandwidth / 2;
+
+    if (p->frequency + p->bandwidth / 2 > m_freqMax)
+      m_freqMax = p->frequency + p->bandwidth / 2;
+
+  }
   // Done!
   return next;
 }
@@ -139,17 +151,27 @@ MultiChannelForwarder::canOpen() const
   return false;
 }
 
+SUFREQ
+MultiChannelForwarder::span() const
+{
+  return m_freqMax - m_freqMin;
+}
+
+SUFREQ
+MultiChannelForwarder::getCenter() const
+{
+  return .5 * (m_freqMax + m_freqMin);
+}
+
 bool
 MultiChannelForwarder::canCenter() const
 {
-  SUFREQ freqBandwidth = m_freqMax - m_freqMin;
-
   if (m_analyzer == nullptr)
     return false;
 
   Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
 
-  if (freqBandwidth > info.getSampleRate())
+  if (span() > info.getSampleRate())
     return false;
 
   return true;
@@ -169,6 +191,13 @@ MultiChannelForwarder::center()
 
   return true;
 }
+
+bool
+MultiChannelForwarder::isOpen() const
+{
+  return m_opened;
+}
+
 
 MasterChannel *
 MultiChannelForwarder::getMasterFromRequest(Suscan::RequestId reqId) const
@@ -295,7 +324,8 @@ MultiChannelForwarder::keepOpening()
 
         p->reqId = m_analyzer->allocateRequestId();
         channel.fc = p->frequency - info.getFrequency();
-        channel.bw = p->bandwidth;
+        channel.fHigh = channel.fc + p->bandwidth / 2;
+        channel.fLow  = channel.fc - p->bandwidth / 2;
 
         // Open master (no precision)
         m_analyzer->open("multicarrier", channel, p->reqId);
@@ -315,7 +345,8 @@ MultiChannelForwarder::keepOpening()
 
             c->reqId = m_analyzer->allocateRequestId();
             channel.fc = c->offset;
-            channel.bw = c->bandwidth;
+            channel.fHigh = channel.fc + p->bandwidth / 2;
+            channel.fLow  = channel.fc - p->bandwidth / 2;
 
             m_analyzer->openEx(
                   c->inspClass,
@@ -368,16 +399,15 @@ MultiChannelForwarder::closeAll()
         }
       }
     }
-
-    masterMap.clear();
-    channelMap.clear();
-
-    pendingMasterMap.clear();
-    pendingChannelMap.clear();
-
-    m_opened = false;
   }
 
+  masterMap.clear();
+  channelMap.clear();
+
+  pendingMasterMap.clear();
+  pendingChannelMap.clear();
+
+  m_opened = false;
   m_opening = false;
 }
 
@@ -411,7 +441,7 @@ void
 MultiChannelForwarder::clearErrors()
 {
   m_errors = "";
-  m_failed = true;
+  m_failed = false;
 }
 
 std::string
@@ -524,6 +554,12 @@ MultiChannelForwarder::makeMaster(const char *name, SUFREQ frequency, SUFLOAT ba
 
   master->iter = masterList.insert(masterList.cend(), master);
   masterHash[name] = master;
+
+  if (frequency - bandwidth / 2 < m_freqMin)
+    m_freqMin = frequency - bandwidth / 2;
+
+  if (frequency + bandwidth / 2 > m_freqMax)
+    m_freqMax = frequency + bandwidth / 2;
 
   if (m_opened) {
     m_opening = true;

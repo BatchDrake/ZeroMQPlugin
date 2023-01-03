@@ -25,6 +25,7 @@
 #include <SuWidgetsHelpers.h>
 #include <AddChanDialog.h>
 #include <AddMasterDialog.h>
+#include <QMessageBox>
 
 #include <UIMediator.h>
 #include <MainSpectrum.h>
@@ -131,6 +132,12 @@ ZeroMQWidget::connectAll()
         SLOT(onRemove()));
 
   connect(
+        m_ui->togglePublishingButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onTogglePublishing()));
+
+  connect(
         m_masterDialog,
         SIGNAL(accepted()),
         this,
@@ -179,7 +186,8 @@ ZeroMQWidget::refreshUi()
   for (auto p = m_masterMarkers.begin(); p != m_masterMarkers.end(); ++p) {
     // Verify state of this master:
     MasterChannel *master = m_forwarder->findMaster(p.key().c_str());
-    NamedChannel *namCh   = p.value().value();
+    NamedChannelSetIterator it = p.value();
+    NamedChannel *namCh   = it.value();
     QColor color;
 
     if (master != nullptr) {
@@ -190,13 +198,16 @@ ZeroMQWidget::refreshUi()
       color = QColor(127, 127, 127);
     }
 
-    namCh->cutOffColor = namCh->markerColor = color;
+    namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
+
+    m_spectrum->refreshChannel(it);
   }
 
   for (auto p = m_channelMarkers.begin(); p != m_channelMarkers.end(); ++p) {
     // Verify state of this master:
     ChannelDescription *chan = m_forwarder->findChannel(p.key().c_str());
-    NamedChannel *namCh   = p.value().value();
+    NamedChannelSetIterator it = p.value();
+    NamedChannel *namCh   = it.value();
     QColor color;
 
     if (chan != nullptr) {
@@ -207,7 +218,9 @@ ZeroMQWidget::refreshUi()
       color = QColor(127, 127, 127);
     }
 
-    namCh->cutOffColor = namCh->markerColor = color;
+    namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
+
+    m_spectrum->refreshChannel(it);
   }
 }
 
@@ -247,6 +260,65 @@ ZeroMQWidget::doRemoveChannel(ChannelDescription *channel)
   // Update view
   m_treeModel->rebuildStructure();
   refreshUi();
+}
+
+void
+ZeroMQWidget::checkStartStop()
+{
+  bool tryOpen = m_ui->togglePublishingButton->isChecked();
+  bool isOpen  = m_forwarder->isOpen();
+
+  printf("Check Start Stop\n");
+  if (isOpen != tryOpen && m_analyzer != nullptr) {
+    printf("Discordance\n");
+    if (!tryOpen) {
+      // Close all
+      printf("Try close\n");
+      m_forwarder->closeAll();
+      refreshUi();
+    } else {
+      printf("Try open!\n");
+      if (!m_forwarder->canOpen()) {
+        printf("But cannot open\n");
+        m_ui->togglePublishingButton->setChecked(false);
+        if (m_forwarder->canCenter()) {
+          auto freq = m_forwarder->getCenter();
+          auto answer = QMessageBox::question(
+                this,
+                "ZeroMQ forwarder",
+                "ZeroMQ forwarder was disabled because some of the channels fall outside of the current portion of the spectrum. "
+                "Do you want to attempt to shift the current spectrum to the optimal center frequency "
+                  + SuWidgetsHelpers::formatQuantity(freq, "Hz")
+                  + " before trying again?",
+                QMessageBox::Yes | QMessageBox::No);
+          if (answer == QMessageBox::Yes) {
+            try {
+              m_spectrum->setFreqs(
+                    static_cast<qint64>(freq),
+                    static_cast<qint64>(m_analyzer->getLnbFrequency()));
+            } catch (Suscan::Exception &) {
+              QMessageBox::critical(
+                    this,
+                    "ZeroMQ forwarder",
+                    "Failed to change analyzer frequency.");
+            }
+          }
+        } else {
+          QMessageBox::warning(
+                this,
+                "ZeroMQ forwarder",
+                "ZeroMQ forwarder was disabled because the sample rate is too low "
+                "to keep all channels opened at the same time. Note that the current channel "
+                "configuration requires a a sample rate of at least "
+                + SuWidgetsHelpers::formatQuantity(m_forwarder->span(), "sps")
+                + ".");
+        }
+      } else {
+        printf("Can open, openAll()\n");
+        m_forwarder->openAll();
+      }
+    }
+  }
 }
 
 void
@@ -361,6 +433,7 @@ ZeroMQWidget::setState(int state, Suscan::Analyzer *analyzer)
 
   m_forwarder->setAnalyzer(analyzer);
   refreshUi();
+  checkStartStop();
 }
 
 void
@@ -420,8 +493,20 @@ ZeroMQWidget::onSourceInfoMessage(Suscan::SourceInfoMessage const &)
 void
 ZeroMQWidget::onInspectorMessage(const Suscan::InspectorMessage &msg)
 {
-  if (m_forwarder->processMessage(msg))
+  m_forwarder->clearErrors();
+
+  if (m_forwarder->processMessage(msg)) {
+    if (m_forwarder->failed()) {
+      QMessageBox::warning(
+            this,
+            "ZeroMQ forwarder",
+            "Multi-channel forwarder error: "
+            + QString::fromStdString(m_forwarder->getErrors()));
+      m_forwarder->closeAll();
+    }
+
     refreshUi();
+  }
 }
 
 void
@@ -482,4 +567,11 @@ ZeroMQWidget::onRemove()
         break;
     }
   }
+}
+
+void
+ZeroMQWidget::onTogglePublishing()
+{
+  printf("Toggle\n");
+  checkStartStop();
 }

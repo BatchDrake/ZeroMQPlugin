@@ -196,6 +196,9 @@ public:
   bool canOpen() const; // Returns if channels can be opened
   bool canCenter() const; // Returns if all masters fit
   bool center(); // Center masters
+  SUFREQ span() const;
+  SUFREQ getCenter() const;
+  bool isOpen() const;
 
   void setAnalyzer(Suscan::Analyzer *); // Used to update changes
   void openAll(); // Used to open all masters and channels
