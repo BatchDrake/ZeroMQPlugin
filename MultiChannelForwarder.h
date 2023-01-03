@@ -43,6 +43,12 @@ struct ChannelDescription {
   bool               opening = false;
   bool               deleted = false;
 
+  inline bool
+  isOpen() const
+  {
+    return handle != SUSCAN_INVALID_HANDLE_VALUE;
+  }
+
   ~ChannelDescription();
 };
 
@@ -58,6 +64,18 @@ struct MasterChannel {
   bool               opening = false;
   unsigned int       open_count = 0;
   bool               deleted = false;
+
+  inline bool
+  isOpen() const
+  {
+    return handle != SUSCAN_INVALID_HANDLE_VALUE;
+  }
+
+  inline bool
+  isEmpty() const
+  {
+    return channels.empty();
+  }
 };
 
 class MultiChannelForwarder
@@ -135,6 +153,9 @@ public:
     if (it == masterHash.cend())
       return nullptr;
 
+    if (it->second->deleted)
+      return nullptr;
+
     return it->second;
   }
 
@@ -144,6 +165,9 @@ public:
     auto it = channelHash.find(name);
 
     if (it == channelHash.cend())
+      return nullptr;
+
+    if (it->second->deleted)
       return nullptr;
 
     return it->second;
@@ -160,6 +184,12 @@ public:
     return removeMaster(it->second->iter);
   }
 
+  bool
+  empty() const
+  {
+    return masterList.empty();
+  }
+
   bool failed() const; // Something went wrong
   std::string getErrors() const;
   void clearErrors();
@@ -171,11 +201,13 @@ public:
   void openAll(); // Used to open all masters and channels
   void closeAll(); // Used to close all masters and channels
 
-  void processMessage(Suscan::InspectorMessage const &);
-  void feedSamplesMessage(Suscan::SamplesMessage const &);
+  bool processMessage(Suscan::InspectorMessage const &);
+  bool feedSamplesMessage(Suscan::SamplesMessage const &);
 
   MasterChannel *makeMaster(const char *, SUFREQ freq, SUFLOAT bw);
   bool removeMaster(MasterListIterator);
+  bool removeMaster(MasterChannel *);
+
   MasterListConstIterator findMaster(SUFREQ freq, SUFLOAT bw) const;
 
   ChannelDescription *makeChannel(
@@ -185,6 +217,7 @@ public:
       const char *inspClass,
       ChannelConsumer *);
   bool removeChannel(ChannelListIterator);
+  bool removeChannel(ChannelDescription *);
 
   MultiChannelForwarder();
   ~MultiChannelForwarder();

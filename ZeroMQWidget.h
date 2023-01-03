@@ -21,6 +21,8 @@
 
 #include <ToolWidgetFactory.h>
 #include <QWidget>
+#include <QHash>
+#include <MainSpectrum.h>
 
 namespace Ui {
   class ZeroMQWidget;
@@ -29,7 +31,12 @@ namespace Ui {
 class MultiChannelForwarder;
 class MultiChannelTreeModel;
 
+class MasterChannel;
+class ChannelDescription;
+
 namespace SigDigger {
+  class AddChanDialog;
+  class AddMasterDialog;
   class AudioProcessor;
   class ZeroMQWidgetFactory;
   class FrequencyCorrectionDialog;
@@ -60,8 +67,27 @@ namespace SigDigger {
     int m_state = 0;
     MainSpectrum *m_spectrum = nullptr;
     Ui::ZeroMQWidget *m_ui = nullptr;
+    AddChanDialog *m_chanDialog = nullptr;
+    AddMasterDialog *m_masterDialog = nullptr;
+
+    // Master channel markers
+    QHash<std::string, NamedChannelSetIterator> m_masterMarkers;
+    QHash<std::string, NamedChannelSetIterator> m_channelMarkers;
 
     void refreshUi();
+
+    void doRemoveMaster(MasterChannel *);
+    void doRemoveChannel(ChannelDescription *);
+
+    // High-level logic
+    void fwdAddMaster();
+    void fwdAddChannel();
+
+    void fwdOpenChannels();
+    void fwdCloseChannels();
+
+    void applySpectrumState();
+    void connectAll();
 
   public:
     ZeroMQWidget(ZeroMQWidgetFactory *, UIMediator *, QWidget *parent = nullptr);
@@ -80,7 +106,22 @@ namespace SigDigger {
     void setProfile(Suscan::Source::Config &) override;
 
   public slots:
+    void onSpectrumBandwidthChanged();
+    void onSpectrumLoChanged(qint64);
+    void onSpectrumFrequencyChanged(qint64 freq);
+
     void onSourceInfoMessage(Suscan::SourceInfoMessage const &);
+    void onInspectorMessage(Suscan::InspectorMessage const &);
+    void onSamplesMessage(Suscan::SamplesMessage const &);
+
+    void onAddMaster();
+    void onAddMasterConfirm();
+
+    void onAddChannel();
+    void onAddChannelConfirm();
+
+    void onChangeCurrent();
+    void onRemove();
   };
 }
 

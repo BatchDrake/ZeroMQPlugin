@@ -11,34 +11,38 @@ namespace Ui {
   class AddChanDialog;
 }
 
-class AddChanDialog : public QDialog
-{
-  Q_OBJECT
+namespace SigDigger {
+  class AddChanDialog : public QDialog
+  {
+    Q_OBJECT
 
-  MultiChannelForwarder *m_forwarder = nullptr;
-  QVector<unsigned> m_sampleRates;
+    MultiChannelForwarder *m_forwarder = nullptr;
+    QVector<unsigned> m_sampleRates;
 
-  void connectAll();
-  void refreshUi();
-  void populateRates();
+    void connectAll();
+    void refreshUi();
+    void populateRates();
 
-public:
-  explicit AddChanDialog(MultiChannelForwarder *, QWidget *parent = nullptr);
-  void setFrequency(SUFREQ);
-  void setBandwidth(SUFLOAT);
+  public:
+    explicit AddChanDialog(MultiChannelForwarder *, QWidget *parent = nullptr);
+    void setFrequency(SUFREQ);
+    void setBandwidth(SUFLOAT);
 
-  SUFREQ  getFrequency() const;
-  SUFLOAT getBandwidth() const;
-  QString getDemodType() const;
-  unsigned int getSampleRate() const;
+    SUFREQ  getFrequency() const;
+    SUFLOAT getBandwidth() const;
+    QString getName() const;
+    QString getDemodType() const;
+    unsigned int getSampleRate() const;
+    void suggestName();
 
-  ~AddChanDialog();
+    ~AddChanDialog();
 
-private:
-  Ui::AddChanDialog *ui;
+  private:
+    Ui::AddChanDialog *ui;
 
-public slots:
-  void onChanEdited();
-};
+  public slots:
+    void onChanEdited();
+  };
+}
 
 #endif // ADDCHANDIALOG_H

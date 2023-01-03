@@ -1,6 +1,9 @@
 #include "AddChanDialog.h"
 #include "ui_AddChanDialog.h"
 #include "MultiChannelForwarder.h"
+#include <QPushButton>
+
+using namespace SigDigger;
 
 AddChanDialog::AddChanDialog(MultiChannelForwarder *fw, QWidget *parent) :
   QDialog(parent),
@@ -31,6 +34,7 @@ AddChanDialog::AddChanDialog(MultiChannelForwarder *fw, QWidget *parent) :
 
 #undef ADD_SAMP_RATE
 
+  refreshUi();
   connectAll();
 }
 
@@ -83,6 +87,12 @@ AddChanDialog::connectAll()
         SIGNAL(rejected()),
         this,
         SIGNAL(rejected()));
+
+  connect(
+        ui->nameEdit,
+        SIGNAL(textEdited(QString)),
+        this,
+        SLOT(onChanEdited()));
 }
 
 void
@@ -90,6 +100,9 @@ AddChanDialog::refreshUi()
 {
   SUFLOAT frequency = getFrequency();
   SUFLOAT bandwidth = getBandwidth();
+  std::string name = getName().toStdString();
+  bool okToGo = false;
+  QString nameStyleSheet = "";
   MasterListConstIterator it;
 
   it = m_forwarder->findMaster(frequency, bandwidth);
@@ -97,11 +110,20 @@ AddChanDialog::refreshUi()
   if (it == m_forwarder->cend()) {
     ui->masterLabel->setText("Invalid");
     ui->masterLabel->setStyleSheet("color: red");
+  } else if (
+             name.size() == 0
+             || m_forwarder->findChannel(name.c_str()) != nullptr) {
+    nameStyleSheet = "background-color: #ff7f7f; color: black;";
   } else {
     MasterChannel *master = *it;
     ui->masterLabel->setText(QString::fromStdString(master->name));
     ui->masterLabel->setStyleSheet("");
+    okToGo = true;
   }
+
+  ui->nameEdit->setStyleSheet(nameStyleSheet);
+  ui->buttonBox->button(
+        QDialogButtonBox::StandardButton::Ok)->setEnabled(okToGo);
 }
 
 void
@@ -149,4 +171,69 @@ AddChanDialog::getSampleRate() const
     return 0;
 
   return ui->sampleRateCombo->currentData().value<unsigned>();
+}
+
+QString
+AddChanDialog::getName() const
+{
+  return ui->nameEdit->text();
+}
+
+void
+AddChanDialog::suggestName()
+{
+  std::string name = getName().toStdString();
+  std::string lastChannel, suggestion;
+  int index = 1;
+
+  if (name.size() == 0) {
+    lastChannel = "VFO (1)";
+  } else {
+    lastChannel = name;
+  }
+
+  QString asQString = QString::fromStdString(lastChannel);
+  QString qSuggestion;
+  QRegularExpression rx("[0-9]+");
+  QRegularExpressionMatch match = rx.match(asQString);
+
+  int lastIndex = match.lastCapturedIndex();
+  int offset, size;
+
+  if (lastIndex != -1) {
+    std::string as_string;
+
+    offset    = match.capturedStart(lastIndex);
+    size      = match.capturedLength(lastIndex);
+
+    as_string = match.captured(lastIndex).toStdString();
+    if (sscanf(as_string.c_str(), "%d", &index) != 1)
+      index = 1;
+  }
+
+  qSuggestion = asQString;
+  suggestion = qSuggestion.toStdString();
+
+  while (m_forwarder->findChannel(suggestion.c_str()) != nullptr) {
+    ++index;
+
+    if (lastIndex != -1) {
+      qSuggestion = asQString;
+      qSuggestion.replace(offset, size, QString::number(index));
+    } else {
+      qSuggestion = asQString + " (" + QString::number(index) + ")";
+    }
+
+    suggestion = qSuggestion.toStdString();
+  }
+
+  ui->nameEdit->setText(qSuggestion);
+  refreshUi();
+}
+
+////////////////////////// Slots //////////////////////////////////////////////
+void
+AddChanDialog::onChanEdited()
+{
+  refreshUi();
 }

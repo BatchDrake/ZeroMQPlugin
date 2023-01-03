@@ -1,4 +1,18 @@
 #include "MultiChannelTreeModel.h"
+#include <SuWidgetsHelpers.h>
+
+MultiChannelTreeItem *
+MultiChannelTreeModel::indexData(const QModelIndex &index)
+{
+  MultiChannelTreeItem *item;
+
+  if (!index.isValid())
+    return nullptr;
+
+  item = reinterpret_cast<MultiChannelTreeItem *>(index.internalPointer());
+
+  return item;
+}
 
 MultiChannelTreeModel::MultiChannelTreeModel(
     MultiChannelForwarder *forwarder,
@@ -18,9 +32,11 @@ MultiChannelTreeModel::~MultiChannelTreeModel()
 MultiChannelTreeItem *
 MultiChannelTreeModel::allocItem(MultiChannelTreeItemType type)
 {
-  m_treeStructure.push_back(MultiChannelTreeItem());
+  auto item = m_treeStructure.insert(
+        m_treeStructure.size(),
+        MultiChannelTreeItem());
 
-  auto lastItem = &*m_treeStructure.rbegin();
+  auto lastItem = &item.value();
   lastItem->type = type;
 
   return lastItem;
@@ -29,6 +45,8 @@ MultiChannelTreeModel::allocItem(MultiChannelTreeItemType type)
 void
 MultiChannelTreeModel::rebuildStructure()
 {
+  beginResetModel();
+
   m_treeStructure.clear();
   m_rootItem = allocItem(MULTI_CHANNEL_TREE_ITEM_ROOT);
 
@@ -52,6 +70,8 @@ MultiChannelTreeModel::rebuildStructure()
       ++i;
     }
   }
+
+  endResetModel();
 }
 
 QVariant
@@ -73,11 +93,19 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
               return QString::fromStdString(master->name);
 
             case 1:
-              return master->frequency;
+              return SuWidgetsHelpers::formatQuantity(
+                    master->frequency,
+                    "Hz");
 
             case 2:
-              return master->bandwidth;
+              return SuWidgetsHelpers::formatQuantity(
+                    master->bandwidth,
+                    "Hz");
+
+            case 3:
+              return "(Master)";
           }
+
           break;
 
         case MULTI_CHANNEL_TREE_ITEM_CHANNEL:
@@ -88,10 +116,14 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
               return QString::fromStdString(channel->name);
 
             case 1:
-              return channel->offset + channel->parent->frequency;
+              return SuWidgetsHelpers::formatQuantity(
+                    channel->offset + channel->parent->frequency,
+                    "Hz");
 
             case 2:
-              return channel->bandwidth;
+              return SuWidgetsHelpers::formatQuantity(
+                    channel->bandwidth,
+                    "Hz");
 
             case 3:
               return QString::fromStdString(channel->inspClass);
@@ -185,8 +217,6 @@ int
 MultiChannelTreeModel::rowCount(const QModelIndex &parent) const
 {
   MultiChannelTreeItem *parentItem;
-  if (parent.column() > 0)
-      return 0;
 
   if (!parent.isValid())
       parentItem = m_rootItem;

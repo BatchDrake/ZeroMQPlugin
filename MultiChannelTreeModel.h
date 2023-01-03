@@ -3,7 +3,7 @@
 
 #include <QAbstractItemModel>
 #include <MultiChannelForwarder.h>
-#include <QVector>
+#include <QHash>
 
 enum MultiChannelTreeItemType
 {
@@ -31,10 +31,11 @@ class MultiChannelTreeModel : public QAbstractItemModel
   Q_OBJECT
 
   MultiChannelForwarder *m_forwarder = nullptr;
-  QVector<MultiChannelTreeItem> m_treeStructure;
+  QHash<int, MultiChannelTreeItem> m_treeStructure;
   MultiChannelTreeItem *m_rootItem;
 
 public:
+  static MultiChannelTreeItem *indexData(const QModelIndex &);
   void rebuildStructure();
   MultiChannelTreeItem *allocItem(MultiChannelTreeItemType type);
 
