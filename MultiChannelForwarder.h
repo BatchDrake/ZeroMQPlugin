@@ -33,6 +33,7 @@ struct ChannelDescription {
   SUFREQ         offset;
   SUFLOAT        bandwidth;
 
+  SUFLOAT        sampRate;
   std::string    inspClass;
   Suscan::Config inspConfig;
 

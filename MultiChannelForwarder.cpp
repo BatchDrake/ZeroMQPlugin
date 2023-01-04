@@ -3,6 +3,10 @@
 #include <string>
 #include <cstdio>
 
+ChannelConsumer::~ChannelConsumer()
+{
+}
+
 ChannelDescription::~ChannelDescription()
 {
   delete consumer;
@@ -475,6 +479,7 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
           if (ch != nullptr) {
             if (promoteChannel(msg.getRequestId(), msg.getHandle())) {
               m_analyzer->setInspectorId(msg.getHandle(), msg.getHandle());
+              ch->sampRate = msg.getEquivSampleRate();
               ch->consumer->opened(
                     m_analyzer,
                     msg.getHandle(),

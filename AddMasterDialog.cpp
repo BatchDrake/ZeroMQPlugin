@@ -30,18 +30,6 @@ void
 AddMasterDialog::connectAll()
 {
   connect(
-        ui->buttonBox,
-        SIGNAL(accepted()),
-        this,
-        SIGNAL(accepted()));
-
-  connect(
-        ui->buttonBox,
-        SIGNAL(rejected()),
-        this,
-        SIGNAL(rejected()));
-
-  connect(
         ui->nameEdit,
         SIGNAL(textEdited(QString)),
         this,

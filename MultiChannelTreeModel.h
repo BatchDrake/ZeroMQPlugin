@@ -5,6 +5,8 @@
 #include <MultiChannelForwarder.h>
 #include <QHash>
 
+class QTreeView;
+
 enum MultiChannelTreeItemType
 {
   MULTI_CHANNEL_TREE_ITEM_ROOT,
@@ -32,10 +34,12 @@ class MultiChannelTreeModel : public QAbstractItemModel
 
   MultiChannelForwarder *m_forwarder = nullptr;
   QHash<int, MultiChannelTreeItem> m_treeStructure;
+  QHash<QString, MultiChannelTreeItem *> m_masterHash;
   MultiChannelTreeItem *m_rootItem;
 
 public:
   static MultiChannelTreeItem *indexData(const QModelIndex &);
+  void fastExpand(QTreeView *);
   void rebuildStructure();
   MultiChannelTreeItem *allocItem(MultiChannelTreeItemType type);
 

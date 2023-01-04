@@ -74,19 +74,7 @@ AddChanDialog::connectAll()
         ui->bandwidthSpinBox,
         SIGNAL(valueChanged(double)),
         this,
-        SLOT(onChanEdited()));
-
-  connect(
-        ui->buttonBox,
-        SIGNAL(accepted()),
-        this,
-        SIGNAL(accepted()));
-
-  connect(
-        ui->buttonBox,
-        SIGNAL(rejected()),
-        this,
-        SIGNAL(rejected()));
+        SLOT(onBwChanged()));
 
   connect(
         ui->nameEdit,
@@ -108,7 +96,10 @@ AddChanDialog::refreshUi()
   it = m_forwarder->findMaster(frequency, bandwidth);
 
   if (it == m_forwarder->cend()) {
-    ui->masterLabel->setText("Invalid");
+    ui->masterLabel->setText("Invalid (outside master limits)");
+    ui->masterLabel->setStyleSheet("color: red");
+  } else if (ui->sampleRateCombo->count() == 0) {
+    ui->masterLabel->setText("Invalid (bandwidth below 8 kHz)");
     ui->masterLabel->setStyleSheet("color: red");
   } else if (
              name.size() == 0
@@ -235,5 +226,12 @@ AddChanDialog::suggestName()
 void
 AddChanDialog::onChanEdited()
 {
+  refreshUi();
+}
+
+void
+AddChanDialog::onBwChanged()
+{
+  populateRates();
   refreshUi();
 }

@@ -41,6 +41,7 @@ namespace SigDigger {
     Ui::AddChanDialog *ui;
 
   public slots:
+    void onBwChanged();
     void onChanEdited();
   };
 }

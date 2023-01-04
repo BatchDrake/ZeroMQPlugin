@@ -26,6 +26,7 @@
 #include <AddChanDialog.h>
 #include <AddMasterDialog.h>
 #include <QMessageBox>
+#include <ZeroMQSink.h>
 
 #include <UIMediator.h>
 #include <MainSpectrum.h>
@@ -147,7 +148,7 @@ ZeroMQWidget::connectAll()
         m_chanDialog,
         SIGNAL(accepted()),
         this,
-        SLOT(onAddMasterConfirm()));
+        SLOT(onAddChannelConfirm()));
 
   connect(
         m_spectrum,
@@ -240,6 +241,7 @@ ZeroMQWidget::doRemoveMaster(MasterChannel *master)
 
   // Update view
   m_treeModel->rebuildStructure();
+  m_ui->treeView->expandAll();
   refreshUi();
 }
 
@@ -259,6 +261,7 @@ ZeroMQWidget::doRemoveChannel(ChannelDescription *channel)
 
   // Update view
   m_treeModel->rebuildStructure();
+  m_ui->treeView->expandAll();
   refreshUi();
 }
 
@@ -349,14 +352,64 @@ ZeroMQWidget::fwdAddMaster()
     m_spectrum->refreshChannel(it);
 
     m_treeModel->rebuildStructure();
+    m_ui->treeView->expandAll();
     refreshUi();
+  } else {
+    QString error = QString::fromStdString(m_forwarder->getErrors());
+
+    QMessageBox::warning(
+          this,
+          "Failed to create master",
+          "Master channel creation failed: " + error);
   }
 }
 
 void
 ZeroMQWidget::fwdAddChannel()
 {
+  QString qName = m_chanDialog->getName();
+  QString qChanType = m_chanDialog->getDemodType();
+  unsigned int sampRate = m_chanDialog->getSampleRate();
+  SUFREQ frequency = m_chanDialog->getFrequency();
+  SUFLOAT bandwidth = m_chanDialog->getBandwidth();
+  std::string chanType = qChanType.toStdString();
+  std::string inspClass = chanType == "raw" ? "raw" : "audio";
 
+  std::string name = qName.toStdString();
+
+  m_forwarder->clearErrors();
+  ChannelDescription *channel = m_forwarder->makeChannel(
+        name.c_str(),
+        frequency,
+        bandwidth,
+        inspClass.c_str(),
+        new ZeroMQSink(chanType.c_str(), sampRate));
+
+  if (channel != nullptr) {
+    NamedChannelSetIterator it =
+        m_spectrum->addChannel(
+          qName,
+          frequency,
+          - bandwidth / 2,
+          + bandwidth / 2,
+          QColor(127, 127, 127),
+          QColor(127, 127, 127),
+          QColor(127, 127, 127));
+    it.value()->bandLike = false;
+    m_channelMarkers[name] = it;
+    m_spectrum->refreshChannel(it);
+
+    m_treeModel->rebuildStructure();
+    m_ui->treeView->expandAll();
+    refreshUi();
+  } else {
+    QString error = QString::fromStdString(m_forwarder->getErrors());
+
+    QMessageBox::warning(
+          this,
+          "Failed to create channel",
+          "Channel creation failed: " + error);
+  }
 }
 
 void
@@ -525,20 +578,20 @@ ZeroMQWidget::onAddMaster()
 void
 ZeroMQWidget::onAddMasterConfirm()
 {
-  m_masterDialog->hide();
   fwdAddMaster();
 }
 
 void
 ZeroMQWidget::onAddChannel()
 {
-
+  m_chanDialog->suggestName();
+  m_chanDialog->show();
 }
 
 void
 ZeroMQWidget::onAddChannelConfirm()
 {
-
+  fwdAddChannel();
 }
 
 void

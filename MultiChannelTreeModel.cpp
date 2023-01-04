@@ -1,5 +1,6 @@
 #include "MultiChannelTreeModel.h"
 #include <SuWidgetsHelpers.h>
+#include <QTreeView>
 
 MultiChannelTreeItem *
 MultiChannelTreeModel::indexData(const QModelIndex &index)
@@ -12,6 +13,15 @@ MultiChannelTreeModel::indexData(const QModelIndex &index)
   item = reinterpret_cast<MultiChannelTreeItem *>(index.internalPointer());
 
   return item;
+}
+
+void
+MultiChannelTreeModel::fastExpand(QTreeView *view)
+{
+  QModelIndex parent = createIndex(0, 0, m_rootItem);
+
+  for (auto p : m_masterHash)
+    view->expand(index(p->index, 0, parent));
 }
 
 MultiChannelTreeModel::MultiChannelTreeModel(
@@ -48,6 +58,8 @@ MultiChannelTreeModel::rebuildStructure()
   beginResetModel();
 
   m_treeStructure.clear();
+  m_masterHash.clear();
+
   m_rootItem = allocItem(MULTI_CHANNEL_TREE_ITEM_ROOT);
 
   for (MasterChannel *p : *m_forwarder) {
@@ -57,6 +69,8 @@ MultiChannelTreeModel::rebuildStructure()
     masterItem->master = p;
     masterItem->index  = m_rootItem->children.size();
     m_rootItem->children.push_back(masterItem);
+
+    m_masterHash[p->name.c_str()] = masterItem;
 
     auto i = p->channels.begin();
 
