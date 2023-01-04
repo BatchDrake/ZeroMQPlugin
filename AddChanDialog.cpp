@@ -77,6 +77,12 @@ AddChanDialog::connectAll()
         SLOT(onBwChanged()));
 
   connect(
+        ui->demodTypeCombo,
+        SIGNAL(activated(int)),
+        this,
+        SLOT(onChanEdited()));
+
+  connect(
         ui->nameEdit,
         SIGNAL(textEdited(QString)),
         this,
@@ -92,13 +98,16 @@ AddChanDialog::refreshUi()
   bool okToGo = false;
   QString nameStyleSheet = "";
   MasterListConstIterator it;
+  bool isAudio = getDemodType() != "raw";
 
   it = m_forwarder->findMaster(frequency, bandwidth);
+
+  ui->sampleRateCombo->setEnabled(isAudio);
 
   if (it == m_forwarder->cend()) {
     ui->masterLabel->setText("Invalid (outside master limits)");
     ui->masterLabel->setStyleSheet("color: red");
-  } else if (ui->sampleRateCombo->count() == 0) {
+  } else if (ui->sampleRateCombo->count() == 0 && isAudio) {
     ui->masterLabel->setText("Invalid (bandwidth below 8 kHz)");
     ui->masterLabel->setStyleSheet("color: red");
   } else if (

@@ -214,7 +214,7 @@ ZeroMQWidget::refreshUi()
     if (chan != nullptr) {
       bool opened = chan->handle != SUSCAN_INVALID_HANDLE_VALUE;
 
-      color = opened ? QColor(0, 255, 0) : QColor(255, 255, 255);
+      color = opened ? QColor(255, 165, 0) : QColor(200, 200, 200);
     } else {
       color = QColor(127, 127, 127);
     }
@@ -271,18 +271,13 @@ ZeroMQWidget::checkStartStop()
   bool tryOpen = m_ui->togglePublishingButton->isChecked();
   bool isOpen  = m_forwarder->isOpen();
 
-  printf("Check Start Stop\n");
   if (isOpen != tryOpen && m_analyzer != nullptr) {
-    printf("Discordance\n");
     if (!tryOpen) {
       // Close all
-      printf("Try close\n");
       m_forwarder->closeAll();
       refreshUi();
     } else {
-      printf("Try open!\n");
       if (!m_forwarder->canOpen()) {
-        printf("But cannot open\n");
         m_ui->togglePublishingButton->setChecked(false);
         if (m_forwarder->canCenter()) {
           auto freq = m_forwarder->getCenter();
@@ -317,7 +312,6 @@ ZeroMQWidget::checkStartStop()
                 + ".");
         }
       } else {
-        printf("Can open, openAll()\n");
         m_forwarder->openAll();
       }
     }
@@ -396,6 +390,8 @@ ZeroMQWidget::fwdAddChannel()
           QColor(127, 127, 127),
           QColor(127, 127, 127));
     it.value()->bandLike = false;
+    it.value()->nestLevel = 1;
+
     m_channelMarkers[name] = it;
     m_spectrum->refreshChannel(it);
 
@@ -625,6 +621,5 @@ ZeroMQWidget::onRemove()
 void
 ZeroMQWidget::onTogglePublishing()
 {
-  printf("Toggle\n");
   checkStartStop();
 }

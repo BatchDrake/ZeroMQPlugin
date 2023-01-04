@@ -9,7 +9,6 @@ ZeroMQSink::ZeroMQSink(const char *chanType, SUFLOAT audioSampRate)
 
 ZeroMQSink::~ZeroMQSink()
 {
-  printf("Inspector %s: destroyed\n",  m_channelType.c_str());
 }
 
 void

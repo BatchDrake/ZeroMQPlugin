@@ -265,7 +265,6 @@ MultiChannelForwarder::promoteMaster(Suscan::RequestId reqId, Suscan::Handle hnd
 
   master->handle  = hnd;
   master->opening = false;
-  ++master->open_count;
 
   masterMap[hnd]  = master;
 
@@ -302,6 +301,8 @@ MultiChannelForwarder::promoteChannel(Suscan::RequestId reqId, Suscan::Handle hn
 
   channel->handle  = hnd;
   channel->opening = false;
+
+  ++channel->parent->open_count;
 
   channelMap[hnd]  = channel;
 
@@ -492,6 +493,9 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
           changes = true;
         }
 
+        if (changes)
+          keepOpening();
+
         m_opened = !(pendingMasterMap.size() > 0 || pendingChannelMap.size() > 0);
         m_opening = !m_opened;
         break;
@@ -521,9 +525,6 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
         // Anything else goes in here.
         break;
     }
-
-    if (m_opening)
-      keepOpening();
   }
 
   return changes;
