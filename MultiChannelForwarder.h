@@ -88,6 +88,7 @@ class MultiChannelForwarder
   SUFREQ m_freqMax = -INFINITY;
   std::string m_errors;
   bool m_failed = false;
+  SUFLOAT m_maxBandwidth = 2e5;
 
   // Owner: This holds the structure of the channels to open
   std::list<MasterChannel *> masterList;
@@ -110,7 +111,6 @@ class MultiChannelForwarder
   MasterChannel *getMasterFromRequest(Suscan::RequestId) const;
   ChannelDescription *getChannelFromRequest(Suscan::RequestId) const;
   ChannelDescription *getChannelFromHandle(Suscan::Handle) const;
-
 
   MasterListIterator deleteMaster(MasterListIterator);
   ChannelListIterator deleteChannel(ChannelListIterator);
@@ -200,6 +200,8 @@ public:
   SUFREQ span() const;
   SUFREQ getCenter() const;
   bool isOpen() const;
+
+  void setMaxBandwidth(SUFLOAT max);
 
   void setAnalyzer(Suscan::Analyzer *); // Used to update changes
   void openAll(); // Used to open all masters and channels

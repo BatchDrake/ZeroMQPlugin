@@ -2,6 +2,8 @@
 #include <analyzer/inspector/params.h>
 #include <zmq.hpp>
 
+#define ZMQ_FLOAT2INT16 32768.
+
 bool
 ZeroMQSink::bind(const char *url)
 {
@@ -23,11 +25,25 @@ ZeroMQSink::write(
     SUSCOUNT size,
     ZeroMQDeliveryMask mask)
 {
-  uint32_t sampRate = sampleRate;
+  union {
+    uint32_t sampRate;
+    uint8_t  asBytes[4];
+  } sampRateBuf;
+  const void *sampleBuffer;
   unsigned int allocSize;
 
   if (!m_state)
     return false;
+
+  sampRateBuf.sampRate = sampleRate;
+
+  // Deliver sample rate
+  m_zmq_socket->send(
+        zmq::buffer(std::string(topic)),
+        zmq::send_flags::sndmore);
+  m_zmq_socket->send(
+        zmq::buffer(sampRateBuf.asBytes, sizeof(uint32_t)),
+        zmq::send_flags::sndmore);
 
   // Convert data
   allocSize = mask == ZEROMQ_DELIVER_COMPLEX ? 2 * size : size;
@@ -37,31 +53,26 @@ ZeroMQSink::write(
   switch (mask) {
     case ZEROMQ_DELIVER_REAL:
       for (SUSCOUNT i = 0; i < size; ++i)
-        m_sampleBuffer[i] = SU_FLOOR(SU_C_REAL(samples[i]) * ((1 << 15) - 1));
+        m_sampleBuffer[i] = SU_FLOOR(SU_C_REAL(samples[i]) * ZMQ_FLOAT2INT16);
 
       break;
 
     case ZEROMQ_DELIVER_IMAG:
       for (SUSCOUNT i = 0; i < size; ++i)
-        m_sampleBuffer[i] = SU_FLOOR(SU_C_IMAG(samples[i]) * ((1 << 15) - 1));
+        m_sampleBuffer[i] = SU_FLOOR(SU_C_IMAG(samples[i]) * ZMQ_FLOAT2INT16);
       break;
 
     case ZEROMQ_DELIVER_COMPLEX:
       for (SUSCOUNT i = 0; i < size; ++i) {
-        m_sampleBuffer[2 * i + 0] = SU_FLOOR(SU_C_REAL(samples[i]) * ((1 << 15) - 1));
-        m_sampleBuffer[2 * i + 1] = SU_FLOOR(SU_C_IMAG(samples[i]) * ((1 << 15) - 1));
+        m_sampleBuffer[2 * i + 0] = SU_FLOOR(SU_C_REAL(samples[i]) * ZMQ_FLOAT2INT16);
+        m_sampleBuffer[2 * i + 1] = SU_FLOOR(SU_C_IMAG(samples[i]) * ZMQ_FLOAT2INT16);
       }
       break;
   }
 
-  // Deliver sample rate
-  m_zmq_socket->send(
-        zmq::buffer(std::string(topic)),
-        zmq::send_flags::sndmore);
-  m_zmq_socket->send(
-        zmq::buffer(&sampRate, sizeof(uint32_t)),
-        zmq::send_flags::sndmore);
-  m_zmq_socket->send(zmq::buffer(m_sampleBuffer.data(), sizeof(int16_t) * allocSize));
+  sampleBuffer = m_sampleBuffer.data();
+
+  m_zmq_socket->send(zmq::buffer(sampleBuffer, sizeof(int16_t) * allocSize));
 
   return 0;
 }
@@ -109,6 +120,17 @@ ZeroMQConsumer::~ZeroMQConsumer()
     fclose(m_fp);
 }
 
+unsigned int
+ZeroMQConsumer::calcBufLen() const
+{
+  unsigned int buflen = static_cast<int>(2 * m_sampRate / 4);
+
+  if (buflen % 512 > 0)
+    buflen = static_cast<int>(2 * m_sampRate / 5);
+
+  return buflen;
+}
+
 void
 ZeroMQConsumer::opened(
     Suscan::Analyzer *analyzer,
@@ -121,11 +143,12 @@ ZeroMQConsumer::opened(
 
   m_topic = channel.name;
 
+
   if (channel.inspClass == "raw") {
     m_sampRate = channel.sampRate;
   } else if (channel.inspClass == "audio") {
     SUFREQ f_edge;
-    SUFLOAT bw_new = m_sampRate * .45;
+    SUFLOAT bw_new = m_sampRate * .5;
     Suscan::AnalyzerSourceInfo info = analyzer->getSourceInfo();
     Suscan::Config newConfig(config.getInstance());
     uint64_t demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_DISABLED;
@@ -173,6 +196,7 @@ ZeroMQConsumer::opened(
     // As soon as we start to receive samples, we now we were on the right
     // track, no need to track this request.
     analyzer->setInspectorConfig(handle, newConfig);
+    analyzer->setInspectorWatermark(handle, calcBufLen());
   }
 
   fileString = QString::fromStdString(m_channelType) + "_" + QString::number(m_sampRate) + ".raw";

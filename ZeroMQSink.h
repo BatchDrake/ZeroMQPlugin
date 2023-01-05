@@ -41,6 +41,8 @@ class ZeroMQConsumer : public ChannelConsumer
   ZeroMQDeliveryMask m_mask;
   FILE *m_fp = nullptr;
 
+  unsigned int calcBufLen() const;
+
 public:
   ZeroMQConsumer(ZeroMQSink *, const char *type, SUFLOAT audioSampRate);
   SUFLOAT getSampRate() const;

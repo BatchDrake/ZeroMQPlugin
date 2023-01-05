@@ -26,6 +26,8 @@ AddChanDialog::AddChanDialog(
   ui->demodTypeCombo->addItem("Audio (USB)", QVariant::fromValue<QString>("audio:usb"));
   ui->demodTypeCombo->addItem("Audio (LSB)", QVariant::fromValue<QString>("audio:lsb"));
 
+  ui->demodTypeCombo->setCurrentIndex(3);
+
 #define ADD_SAMP_RATE(x) m_sampleRates.push_back(x)
 
   ADD_SAMP_RATE(8000);
@@ -39,8 +41,6 @@ AddChanDialog::AddChanDialog(
   ADD_SAMP_RATE(192000);
 
 #undef ADD_SAMP_RATE
-
-  setBandwidth(193e3);
 
   refreshUi();
   connectAll();
@@ -97,16 +97,8 @@ AddChanDialog::populateRates()
   SUFLOAT bandwidth = getBandwidth();
 
   if (bandwidth > 0) {
-    unsigned savedRate;
+    unsigned savedRate = m_lastRate;
     int index = -1;
-
-    if (ui->sampleRateCombo->currentIndex() != -1) {
-      savedRate = getSampleRate();
-      if (savedRate == 0)
-        savedRate = bandwidth;
-    } else {
-      savedRate = bandwidth;
-    }
 
     ui->sampleRateCombo->clear();
 
@@ -145,7 +137,7 @@ AddChanDialog::connectAll()
         ui->demodTypeCombo,
         SIGNAL(activated(int)),
         this,
-        SLOT(onChanEdited()));
+        SLOT(onSampleRateChanged()));
 
   connect(
         ui->nameEdit,
@@ -318,5 +310,16 @@ void
 AddChanDialog::onBwChanged()
 {
   populateRates();
+  refreshUi();
+}
+
+void
+AddChanDialog::onSampleRateChanged()
+{
+  int rate = getSampleRate();
+
+  if (rate != 0)
+    m_lastRate = rate;
+
   refreshUi();
 }

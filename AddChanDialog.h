@@ -17,6 +17,7 @@ namespace SigDigger {
   {
     Q_OBJECT
 
+    unsigned int m_lastRate = 192000;
     MultiChannelForwarder *m_forwarder = nullptr;
     QVector<unsigned> m_sampleRates;
     MainSpectrum::Skewness m_savedSkewness;
@@ -58,6 +59,7 @@ namespace SigDigger {
   public slots:
     void onBwChanged();
     void onChanEdited();
+    void onSampleRateChanged();
   };
 }
 

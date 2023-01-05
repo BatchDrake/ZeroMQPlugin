@@ -258,6 +258,16 @@ ZeroMQWidget::doRemoveMaster(MasterChannel *master)
     m_masterMarkers.remove(master->name);
   }
 
+  // We also need to traverse all children belonging to this master
+  // and remove them accordingly
+  for (auto i = master->channels.begin(); i != master->channels.end(); ++i) {
+    auto c = m_channelMarkers.find(i->name);
+    if (c != m_channelMarkers.end()) {
+      m_spectrum->removeChannel(c.value());
+      m_channelMarkers.remove(c.key());
+    }
+  }
+
   // Remove from forwarder
   m_forwarder->removeMaster(master);
 
@@ -275,7 +285,7 @@ ZeroMQWidget::doRemoveChannel(ChannelDescription *channel)
 
   if (iter != m_channelMarkers.end()) {
     m_spectrum->removeChannel(iter.value());
-    m_masterMarkers.remove(channel->name);
+    m_channelMarkers.remove(channel->name);
   }
 
   // Remove from forwarder

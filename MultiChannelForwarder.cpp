@@ -116,6 +116,9 @@ MultiChannelForwarder::reset()
   masterMap.clear();
   pendingMasterMap.clear();
 
+  channelMap.clear();
+  pendingChannelMap.clear();
+
   m_opening = false;
   m_opened = false;
   clearErrors();
@@ -254,9 +257,13 @@ MultiChannelForwarder::promoteMaster(Suscan::RequestId reqId, Suscan::Handle hnd
     // remote it from the list
     m_analyzer->closeInspector(hnd);
 
+    if (master->opening) {
+      pendingMasterMap.erase(master->reqId);
+      master->opening = false;
+    }
+
     master->deleted = false;
     master->handle = SUSCAN_INVALID_HANDLE_VALUE;
-    master->opening = false;
 
     removeMaster(master->iter);
 
@@ -290,9 +297,13 @@ MultiChannelForwarder::promoteChannel(Suscan::RequestId reqId, Suscan::Handle hn
     // remote it from the list
     m_analyzer->closeInspector(hnd);
 
+    if (channel->opening) {
+      pendingChannelMap.erase(channel->reqId);
+      channel->opening = false;
+    }
+
     channel->deleted = false;
     channel->handle = SUSCAN_INVALID_HANDLE_VALUE;
-    channel->opening = false;
 
     removeChannel(channel->iter);
 
@@ -307,6 +318,12 @@ MultiChannelForwarder::promoteChannel(Suscan::RequestId reqId, Suscan::Handle hn
   channelMap[hnd]  = channel;
 
   return true;
+}
+
+void
+MultiChannelForwarder::setMaxBandwidth(SUFLOAT max)
+{
+  m_maxBandwidth = max;
 }
 
 void
@@ -329,8 +346,9 @@ MultiChannelForwarder::keepOpening()
 
         p->reqId = m_analyzer->allocateRequestId();
         channel.fc = p->frequency - info.getFrequency();
-        channel.fHigh = channel.fc + p->bandwidth / 2;
-        channel.fLow  = channel.fc - p->bandwidth / 2;
+        channel.fHigh = + p->bandwidth / 2;
+        channel.fLow  = - p->bandwidth / 2;
+        channel.bw    =   p->bandwidth;
 
         // Open master (no precision)
         m_analyzer->open("multicarrier", channel, p->reqId);
@@ -347,7 +365,7 @@ MultiChannelForwarder::keepOpening()
           bool chan_opened = c->isOpen();
           if (!chan_opened && !c->opening) {
             Suscan::Channel channel;
-            SUFLOAT extraRoom = 2 * c->bandwidth;
+            SUFLOAT extraRoom = m_maxBandwidth;
             if (extraRoom > p->bandwidth)
               extraRoom = p->bandwidth;
 
@@ -460,6 +478,7 @@ MultiChannelForwarder::getErrors() const
   return m_errors;
 }
 
+
 bool
 MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
 {
@@ -492,7 +511,6 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
                     msg.getHandle(),
                     *ch,
                     Suscan::Config(msg.getCConfig()));
-              m_analyzer->setInspectorWatermark(msg.getHandle(), 12000);
               changes = true;
             }
           }
@@ -554,12 +572,12 @@ MultiChannelForwarder::feedSamplesMessage(Suscan::SamplesMessage const &msg)
 MasterChannel *
 MultiChannelForwarder::makeMaster(const char *name, SUFREQ frequency, SUFLOAT bandwidth)
 {
-  MasterChannel *master = new MasterChannel;
-
   if (findMaster(name) != nullptr) {
     error("Master channel `%s' already exists.\n", name);
     return nullptr;
   }
+
+  MasterChannel *master = new MasterChannel;
 
   master->name      = name;
   master->frequency = frequency;
@@ -604,6 +622,7 @@ MultiChannelForwarder::removeMaster(MasterListIterator it)
       // We do not need to traverse the subchannels here. The closure
       // of the master triggers the close of the children
       m_analyzer->closeInspector(master->handle);
+      masterMap.erase(master->handle);
       master->handle = SUSCAN_INVALID_HANDLE_VALUE;
     }
   }
@@ -646,6 +665,13 @@ MultiChannelForwarder::makeChannel(
     const char *inspClass,
     ChannelConsumer *co)
 {
+  if (bw > m_maxBandwidth) {
+    error(
+      "Channel bandwidth (%g) exceeds configured maximum bandwidth (%g).\n",
+      bw,
+      m_maxBandwidth);
+  }
+
   auto it = findMaster(freq, bw);
 
   if (it == cend()) {
@@ -657,6 +683,7 @@ MultiChannelForwarder::makeChannel(
     error("Channel `%s' already exists\n", name);
     return nullptr;
   }
+
 
   MasterChannel *master = *it;
   ChannelDescription *channel;
@@ -702,6 +729,7 @@ MultiChannelForwarder::removeChannel(ChannelListIterator it)
       // We do not need to traverse the subchannels here. The closure
       // of the master triggers the close of the children
       m_analyzer->closeInspector(channel->handle);
+      channelMap.erase(channel->handle);
       channel->handle = SUSCAN_INVALID_HANDLE_VALUE;
     }
   }
