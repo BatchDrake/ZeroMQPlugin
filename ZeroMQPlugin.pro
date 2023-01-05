@@ -43,7 +43,7 @@ HEADERS += \
 INCLUDEPATH += $$SUWIDGETS_INSTALL_HEADERS $$SIGDIGGER_INSTALL_HEADERS
 
 unix: CONFIG += link_pkgconfig
-unix: PKGCONFIG += suscan sigutils fftw3 alsa sndfile
+unix: PKGCONFIG += suscan sigutils fftw3 sndfile cppzmq
 
 CONFIG += c++11
 

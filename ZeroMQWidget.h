@@ -34,6 +34,8 @@ class MultiChannelTreeModel;
 class MasterChannel;
 class ChannelDescription;
 
+class ZeroMQSink;
+
 namespace SigDigger {
   class AddChanDialog;
   class AddMasterDialog;
@@ -62,6 +64,7 @@ namespace SigDigger {
     bool m_haveSourceInfo = false;
     MultiChannelForwarder *m_forwarder = nullptr;
     MultiChannelTreeModel *m_treeModel = nullptr;
+    ZeroMQSink *m_zmqSink = nullptr;
 
     // UI members
     int m_state = 0;

@@ -5,13 +5,17 @@
 
 using namespace SigDigger;
 
-AddChanDialog::AddChanDialog(MultiChannelForwarder *fw, QWidget *parent) :
+AddChanDialog::AddChanDialog(
+    MainSpectrum *spectrum,
+    MultiChannelForwarder *fw,
+    QWidget *parent) :
   QDialog(parent),
   ui(new Ui::AddChanDialog)
 {
   ui->setupUi(this);
 
   m_forwarder = fw;
+  m_spectrum = spectrum;
 
   ui->sampleRateCombo->clear();
   ui->demodTypeCombo->clear();
@@ -26,6 +30,8 @@ AddChanDialog::AddChanDialog(MultiChannelForwarder *fw, QWidget *parent) :
 
   ADD_SAMP_RATE(8000);
   ADD_SAMP_RATE(16000);
+  ADD_SAMP_RATE(24000);
+  ADD_SAMP_RATE(25000);
   ADD_SAMP_RATE(32000);
   ADD_SAMP_RATE(44100);
   ADD_SAMP_RATE(48000);
@@ -33,6 +39,8 @@ AddChanDialog::AddChanDialog(MultiChannelForwarder *fw, QWidget *parent) :
   ADD_SAMP_RATE(192000);
 
 #undef ADD_SAMP_RATE
+
+  setBandwidth(193e3);
 
   refreshUi();
   connectAll();
@@ -44,20 +52,77 @@ AddChanDialog::~AddChanDialog()
 }
 
 void
+AddChanDialog::hideEvent(QHideEvent *)
+{
+  m_spectrum->setFilterSkewness(m_savedSkewness);
+}
+
+void
+AddChanDialog::showEvent(QShowEvent *)
+{
+  m_savedSkewness = m_spectrum->getFilterSkewness();
+  refreshUi();
+}
+
+SUFREQ
+AddChanDialog::getAdjustedFrequency() const
+{
+  QString demod = getDemodType();
+  SUFLOAT adjustedBandwidth = getAdjustedBandwidth();
+  SUFREQ freq = getFrequency();
+
+  if (demod == "audio:usb")
+    freq += .5 * adjustedBandwidth;
+  else if (demod == "audio:lsb")
+    freq -= .5 * adjustedBandwidth;
+
+  return freq;
+}
+
+SUFLOAT
+AddChanDialog::getAdjustedBandwidth() const
+{
+  QString demod = getDemodType();
+  SUFLOAT multiplier = 1;
+
+  if (demod == "audio:usb" || demod == "audio:lsb")
+    multiplier = .5;
+
+  return getBandwidth() * multiplier;
+}
+
+void
 AddChanDialog::populateRates()
 {
   SUFLOAT bandwidth = getBandwidth();
 
   if (bandwidth > 0) {
+    unsigned savedRate;
+    int index = -1;
+
+    if (ui->sampleRateCombo->currentIndex() != -1) {
+      savedRate = getSampleRate();
+      if (savedRate == 0)
+        savedRate = bandwidth;
+    } else {
+      savedRate = bandwidth;
+    }
+
     ui->sampleRateCombo->clear();
 
     for (auto rate : m_sampleRates) {
       if (rate < bandwidth) {
+        if (rate <= savedRate)
+          index = ui->sampleRateCombo->count();
+
         ui->sampleRateCombo->addItem(
               QString::number(rate),
               QVariant::fromValue<unsigned>(rate));
       }
     }
+
+    if (index != -1)
+      ui->sampleRateCombo->setCurrentIndex(index);
   }
 }
 
@@ -92,9 +157,10 @@ AddChanDialog::connectAll()
 void
 AddChanDialog::refreshUi()
 {
-  SUFLOAT frequency = getFrequency();
-  SUFLOAT bandwidth = getBandwidth();
+  SUFLOAT frequency = getAdjustedFrequency();
+  SUFLOAT bandwidth = getAdjustedBandwidth();
   std::string name = getName().toStdString();
+  QString demod = getDemodType();
   bool okToGo = false;
   QString nameStyleSheet = "";
   MasterListConstIterator it;
@@ -103,6 +169,16 @@ AddChanDialog::refreshUi()
   it = m_forwarder->findMaster(frequency, bandwidth);
 
   ui->sampleRateCombo->setEnabled(isAudio);
+
+  if (isVisible()) {
+    MainSpectrum::Skewness skewness = MainSpectrum::Skewness::SYMMETRIC;
+    if (demod == "audio:usb")
+      skewness = MainSpectrum::Skewness::UPPER;
+    else if (demod == "audio:lsb")
+      skewness = MainSpectrum::Skewness::LOWER;
+
+    m_spectrum->setFilterSkewness(skewness);
+  }
 
   if (it == m_forwarder->cend()) {
     ui->masterLabel->setText("Invalid (outside master limits)");
@@ -187,7 +263,7 @@ AddChanDialog::suggestName()
   int index = 1;
 
   if (name.size() == 0) {
-    lastChannel = "VFO (1)";
+    lastChannel = "VFO_1";
   } else {
     lastChannel = name;
   }

@@ -39,7 +39,7 @@
     </widget>
    </item>
    <item row="0" column="1" colspan="2">
-    <widget class="QLineEdit" name="lineEdit">
+    <widget class="QLineEdit" name="urlEdit">
      <property name="text">
       <string>tcp://*:6003</string>
      </property>

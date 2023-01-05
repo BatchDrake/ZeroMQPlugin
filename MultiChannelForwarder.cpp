@@ -347,11 +347,16 @@ MultiChannelForwarder::keepOpening()
           bool chan_opened = c->isOpen();
           if (!chan_opened && !c->opening) {
             Suscan::Channel channel;
+            SUFLOAT extraRoom = 2 * c->bandwidth;
+            if (extraRoom > p->bandwidth)
+              extraRoom = p->bandwidth;
 
             c->reqId = m_analyzer->allocateRequestId();
-            channel.fc = c->offset;
-            channel.fHigh = channel.fc + p->bandwidth / 2;
-            channel.fLow  = channel.fc - p->bandwidth / 2;
+            channel.fc    = c->offset;
+            channel.fHigh = + .5 * extraRoom;
+            channel.fLow  = - .5 * extraRoom;
+            channel.bw    = extraRoom; // Give some extra room at allocation
+            channel.ft    = 0;
 
             m_analyzer->openEx(
                   c->inspClass,
@@ -480,12 +485,14 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
           if (ch != nullptr) {
             if (promoteChannel(msg.getRequestId(), msg.getHandle())) {
               m_analyzer->setInspectorId(msg.getHandle(), msg.getHandle());
+              m_analyzer->setInspectorBandwidth(msg.getHandle(), ch->bandwidth);
               ch->sampRate = msg.getEquivSampleRate();
               ch->consumer->opened(
                     m_analyzer,
                     msg.getHandle(),
                     *ch,
                     Suscan::Config(msg.getCConfig()));
+              m_analyzer->setInspectorWatermark(msg.getHandle(), 12000);
               changes = true;
             }
           }

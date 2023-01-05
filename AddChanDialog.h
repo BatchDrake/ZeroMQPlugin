@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <Suscan/Analyzer.h>
 #include <QVector>
+#include <MainSpectrum.h>
 
 class MultiChannelForwarder;
 
@@ -18,18 +19,32 @@ namespace SigDigger {
 
     MultiChannelForwarder *m_forwarder = nullptr;
     QVector<unsigned> m_sampleRates;
+    MainSpectrum::Skewness m_savedSkewness;
+    MainSpectrum *m_spectrum;
 
     void connectAll();
     void refreshUi();
     void populateRates();
 
   public:
-    explicit AddChanDialog(MultiChannelForwarder *, QWidget *parent = nullptr);
+    explicit AddChanDialog(
+        MainSpectrum *spectrum,
+        MultiChannelForwarder *,
+        QWidget *parent = nullptr);
+
+    void hideEvent(QHideEvent *) override;
+    void showEvent(QShowEvent *) override;
+
+
     void setFrequency(SUFREQ);
     void setBandwidth(SUFLOAT);
 
     SUFREQ  getFrequency() const;
     SUFLOAT getBandwidth() const;
+
+    SUFREQ getAdjustedFrequency() const;
+    SUFLOAT getAdjustedBandwidth() const;
+
     QString getName() const;
     QString getDemodType() const;
     unsigned int getSampleRate() const;

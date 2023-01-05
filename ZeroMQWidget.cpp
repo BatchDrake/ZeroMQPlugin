@@ -74,7 +74,9 @@ ZeroMQWidget::ZeroMQWidget(
   m_ui->treeView->setModel(m_treeModel);
 
   m_masterDialog = new AddMasterDialog(m_forwarder, this);
-  m_chanDialog   = new AddChanDialog(m_forwarder, this);
+  m_chanDialog   = new AddChanDialog(m_spectrum, m_forwarder, this);
+
+  m_zmqSink = new ZeroMQSink();
 
   assertConfig();
 
@@ -89,6 +91,7 @@ ZeroMQWidget::~ZeroMQWidget()
 {
   delete m_ui;
   delete m_forwarder;
+  delete m_zmqSink;
 }
 
 void
@@ -180,9 +183,28 @@ ZeroMQWidget::refreshUi()
 {
   bool hasMasters = !m_forwarder->empty();
   bool hasCurrent = m_ui->treeView->currentIndex().isValid();
+  bool publishing = m_ui->togglePublishingButton->isChecked();
+  QString style, text;
 
   m_ui->addVFOButton->setEnabled(hasMasters);
   m_ui->removeVFOButton->setEnabled(hasCurrent);
+
+  if (publishing) {
+    style =
+          "background-color: #7f0000;\n"
+          "color: white;\n"
+          "font-weight: bold";
+    text = "Stop publishing";
+  } else {
+    style =
+          "background-color: #007f00;\n"
+          "color: white;\n"
+          "font-weight: bold";
+    text = "Start publishing";
+  }
+
+  m_ui->togglePublishingButton->setText(text);
+  m_ui->togglePublishingButton->setStyleSheet(style);
 
   for (auto p = m_masterMarkers.begin(); p != m_masterMarkers.end(); ++p) {
     // Verify state of this master:
@@ -364,8 +386,8 @@ ZeroMQWidget::fwdAddChannel()
   QString qName = m_chanDialog->getName();
   QString qChanType = m_chanDialog->getDemodType();
   unsigned int sampRate = m_chanDialog->getSampleRate();
-  SUFREQ frequency = m_chanDialog->getFrequency();
-  SUFLOAT bandwidth = m_chanDialog->getBandwidth();
+  SUFREQ frequency = m_chanDialog->getAdjustedFrequency();
+  SUFLOAT bandwidth = m_chanDialog->getAdjustedBandwidth();
   std::string chanType = qChanType.toStdString();
   std::string inspClass = chanType == "raw" ? "raw" : "audio";
 
@@ -377,7 +399,7 @@ ZeroMQWidget::fwdAddChannel()
         frequency,
         bandwidth,
         inspClass.c_str(),
-        new ZeroMQSink(chanType.c_str(), sampRate));
+        new ZeroMQConsumer(m_zmqSink, chanType.c_str(), sampRate));
 
   if (channel != nullptr) {
     NamedChannelSetIterator it =
@@ -621,5 +643,13 @@ ZeroMQWidget::onRemove()
 void
 ZeroMQWidget::onTogglePublishing()
 {
+  if (m_ui->togglePublishingButton->isChecked()) {
+    std::string asString = m_ui->urlEdit->text().toStdString();
+    m_zmqSink->bind(asString.c_str());
+  } else {
+    m_zmqSink->disconnect();
+  }
+
+  refreshUi();
   checkStartStop();
 }
