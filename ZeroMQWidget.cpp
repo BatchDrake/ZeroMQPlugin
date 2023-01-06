@@ -301,7 +301,7 @@ void
 ZeroMQWidget::checkStartStop()
 {
   bool tryOpen = m_ui->togglePublishingButton->isChecked();
-  bool isOpen  = m_forwarder->isOpen();
+  bool isOpen  = m_forwarder->isPartiallyOpen();
 
   if (isOpen != tryOpen && m_analyzer != nullptr) {
     if (!tryOpen) {

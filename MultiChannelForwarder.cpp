@@ -29,7 +29,7 @@ MultiChannelForwarder::deleteChannel(ChannelListIterator it)
 
   // Third: delete channel from the corresponding master. If opened, decrease counter
   // This automatically triggers the destructor
-  if (opened)
+  if (opened && channel->parent->isOpen())
     --channel->parent->open_count;
 
   auto next = channel->parent->channels.erase(it);
@@ -96,7 +96,7 @@ MultiChannelForwarder::reset()
 
       p->handle     = SUSCAN_INVALID_HANDLE_VALUE;
       p->opening    = false;
-      p->open_count = false;
+      p->open_count = 0;
 
       while (i != p->channels.end()) {
         // Channel was deleted? Delete now.
@@ -205,6 +205,11 @@ MultiChannelForwarder::isOpen() const
   return m_opened;
 }
 
+bool
+MultiChannelForwarder::isPartiallyOpen() const
+{
+  return m_opened || m_opening;
+}
 
 MasterChannel *
 MultiChannelForwarder::getMasterFromRequest(Suscan::RequestId reqId) const
@@ -290,6 +295,8 @@ MultiChannelForwarder::promoteChannel(Suscan::RequestId reqId, Suscan::Handle hn
 
   channel = it->second;
 
+  assert(channel->opening);
+
   pendingChannelMap.erase(it);
 
   if (channel->deleted) {
@@ -297,11 +304,7 @@ MultiChannelForwarder::promoteChannel(Suscan::RequestId reqId, Suscan::Handle hn
     // remote it from the list
     m_analyzer->closeInspector(hnd);
 
-    if (channel->opening) {
-      pendingChannelMap.erase(channel->reqId);
-      channel->opening = false;
-    }
-
+    channel->opening = false;
     channel->deleted = false;
     channel->handle = SUSCAN_INVALID_HANDLE_VALUE;
 
@@ -335,6 +338,11 @@ MultiChannelForwarder::keepOpening()
     //  2. If master set is opened: check if there are
     //     pending open requests
 
+    if (masterList.empty()) {
+      m_opened = true;
+      return;
+    }
+
     for (auto p : masterList) {
       bool opened = p->isOpen();
       bool fullyOpened = opened && p->open_count == p->channels.size();
@@ -344,8 +352,8 @@ MultiChannelForwarder::keepOpening()
         Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
         Suscan::Channel channel;
 
-        p->reqId = m_analyzer->allocateRequestId();
-        channel.fc = p->frequency - info.getFrequency();
+        p->reqId      = m_analyzer->allocateRequestId();
+        channel.fc    = p->frequency - info.getFrequency();
         channel.fHigh = + p->bandwidth / 2;
         channel.fLow  = - p->bandwidth / 2;
         channel.bw    =   p->bandwidth;
@@ -363,13 +371,14 @@ MultiChannelForwarder::keepOpening()
              c != p->channels.end();
              ++c) {
           bool chan_opened = c->isOpen();
+
           if (!chan_opened && !c->opening) {
             Suscan::Channel channel;
             SUFLOAT extraRoom = m_maxBandwidth;
             if (extraRoom > p->bandwidth)
               extraRoom = p->bandwidth;
 
-            c->reqId = m_analyzer->allocateRequestId();
+            c->reqId      = m_analyzer->allocateRequestId();
             channel.fc    = c->offset;
             channel.fHigh = + .5 * extraRoom;
             channel.fLow  = - .5 * extraRoom;
@@ -404,39 +413,22 @@ MultiChannelForwarder::openAll()
 void
 MultiChannelForwarder::closeAll()
 {
-  if (m_opened) {
-    if (m_analyzer != nullptr) {
-      for (auto p : masterList) {
-        if (p->isOpen()) {
-          m_analyzer->closeInspector(p->handle);
-          p->handle = SUSCAN_INVALID_HANDLE_VALUE;
-          p->open_count = 0;
-          p->opening = false;
-          p->deleted = false;
+  if (m_analyzer != nullptr) {
+    for (auto p : masterList) {
+      if (p->isOpen())
+        m_analyzer->closeInspector(p->handle);
 
-          for (auto c = p->channels.begin();
-               c != p->channels.end();
-               ++c) {
-            if (c->isOpen()) {
-              c->consumer->closed();
-              c->handle = SUSCAN_INVALID_HANDLE_VALUE;
-              c->opening = false;
-              c->deleted = false;
-            }
-          }
-        }
+      auto i = p->channels.begin();
+
+      while (i != p->channels.end()) {
+        if (i->isOpen())
+          i->consumer->closed();
+        ++i;
       }
     }
   }
 
-  masterMap.clear();
-  channelMap.clear();
-
-  pendingMasterMap.clear();
-  pendingChannelMap.clear();
-
-  m_opened = false;
-  m_opening = false;
+  reset();
 }
 
 template<typename ... arg>
@@ -689,6 +681,7 @@ MultiChannelForwarder::makeChannel(
   ChannelDescription *channel;
 
   master->channels.push_front(ChannelDescription());
+
   channel = &*master->channels.begin();
   channel->name      = name;
   channel->offset    = freq - master->frequency;
@@ -696,7 +689,9 @@ MultiChannelForwarder::makeChannel(
   channel->consumer  = co;
   channel->parent    = master;
   channel->inspClass = inspClass;
-  channel->iter = master->channels.begin();
+  channel->iter      = master->channels.begin();
+  channel->opening   = false;
+  channel->handle    = SUSCAN_INVALID_HANDLE_VALUE;
 
   channelHash[name] = channel;
 
@@ -730,7 +725,6 @@ MultiChannelForwarder::removeChannel(ChannelListIterator it)
       // of the master triggers the close of the children
       m_analyzer->closeInspector(channel->handle);
       channelMap.erase(channel->handle);
-      channel->handle = SUSCAN_INVALID_HANDLE_VALUE;
     }
   }
 

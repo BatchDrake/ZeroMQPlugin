@@ -200,7 +200,7 @@ public:
   SUFREQ span() const;
   SUFREQ getCenter() const;
   bool isOpen() const;
-
+  bool isPartiallyOpen() const;
   void setMaxBandwidth(SUFLOAT max);
 
   void setAnalyzer(Suscan::Analyzer *); // Used to update changes
