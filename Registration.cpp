@@ -1,5 +1,5 @@
 //
-//    Registration.cpp: Register the APT inspector
+//    Registration.cpp: Register the ZeroMQ forwarder
 //    Copyright (C) 2022 Gonzalo José Carracedo Carballal
 //
 //    This program is free software: you can redistribute it and/or modify

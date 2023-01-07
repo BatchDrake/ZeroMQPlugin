@@ -1,5 +1,5 @@
 //
-//    ZeroMQWidget.cpp: description
+//    ZeroMQWidget.cpp: ZeroMQ widget implementation
 //    Copyright (C) 2022 Gonzalo José Carracedo Carballal
 //
 //    This program is free software: you can redistribute it and/or modify

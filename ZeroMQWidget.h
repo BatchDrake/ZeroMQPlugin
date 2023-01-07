@@ -1,5 +1,5 @@
 //
-//    ZeroMQWidget.h: description
+//    ZeroMQWidget.h: ZeroMQ tool widget
 //    Copyright (C) 2022 Gonzalo José Carracedo Carballal
 //
 //    This program is free software: you can redistribute it and/or modify
@@ -16,6 +16,7 @@
 //    License along with this program.  If not, see
 //    <http://www.gnu.org/licenses/>
 //
+
 #ifndef ZEROMQWIDGET_H
 #define ZEROMQWIDGET_H
 
