@@ -36,7 +36,6 @@ namespace SigDigger {
     void hideEvent(QHideEvent *) override;
     void showEvent(QShowEvent *) override;
 
-
     void setFrequency(SUFREQ);
     void setBandwidth(SUFLOAT);
 

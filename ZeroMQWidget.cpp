@@ -73,7 +73,7 @@ ZeroMQWidget::ZeroMQWidget(
 
   m_ui->treeView->setModel(m_treeModel);
 
-  m_masterDialog = new AddMasterDialog(m_forwarder, this);
+  m_masterDialog = new AddMasterDialog(m_spectrum, m_forwarder, this);
   m_chanDialog   = new AddChanDialog(m_spectrum, m_forwarder, this);
 
   m_zmqSink = new ZeroMQSink();

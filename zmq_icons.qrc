@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/zmq_icons">
+        <file>add_master.png</file>
+        <file>add_vfo.png</file>
+        <file>document-open.png</file>
+        <file>document-save-as.png</file>
+        <file>list-remove.png</file>
+    </qresource>
+</RCC>

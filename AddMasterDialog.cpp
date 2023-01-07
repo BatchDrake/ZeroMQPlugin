@@ -8,11 +8,13 @@
 using namespace SigDigger;
 
 AddMasterDialog::AddMasterDialog(
+    MainSpectrum *spectrum,
     MultiChannelForwarder *forwarder,
     QWidget *parent) :
   QDialog(parent),
   ui(new Ui::AddMasterDialog)
 {
+  m_spectrum  = spectrum;
   m_forwarder = forwarder;
 
   ui->setupUi(this);
@@ -52,6 +54,19 @@ AddMasterDialog::refreshUi()
   ui->nameEdit->setStyleSheet(nameStyleSheet);
   ui->buttonBox->button(
         QDialogButtonBox::StandardButton::Ok)->setEnabled(okToGo);
+}
+
+void
+AddMasterDialog::hideEvent(QHideEvent *)
+{
+  m_spectrum->setFilterSkewness(m_savedSkewness);
+}
+
+void
+AddMasterDialog::showEvent(QShowEvent *)
+{
+  m_savedSkewness = m_spectrum->getFilterSkewness();
+  m_spectrum->setFilterSkewness(MainSpectrum::Skewness::SYMMETRIC);
 }
 
 void
@@ -95,7 +110,7 @@ AddMasterDialog::suggestName()
 
   if (name.size() == 0) {
     if (first == last) {
-      lastMaster = "Master Channel";
+      lastMaster = "MASTER_1";
     } else {
       MasterChannel *master = *--last;
       lastMaster = master->name;

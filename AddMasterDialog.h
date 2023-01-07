@@ -3,7 +3,7 @@
 
 #include <QDialog>
 #include <Suscan/Analyzer.h>
-
+#include <MainSpectrum.h>
 
 class MultiChannelForwarder;
 
@@ -17,14 +17,21 @@ namespace SigDigger{
     Q_OBJECT
 
     MultiChannelForwarder *m_forwarder = nullptr;
+    MainSpectrum::Skewness m_savedSkewness;
+    MainSpectrum *m_spectrum;
 
     void connectAll();
     void refreshUi();
 
   public:
     explicit AddMasterDialog(
+        MainSpectrum *,
         MultiChannelForwarder *,
         QWidget *parent = nullptr);
+
+    void hideEvent(QHideEvent *) override;
+    void showEvent(QShowEvent *) override;
+
     void setFrequency(SUFREQ);
     void setBandwidth(SUFLOAT);
 

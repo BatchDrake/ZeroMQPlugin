@@ -20,6 +20,7 @@
 #include <Suscan/Plugin.h>
 #include <Suscan/Library.h>
 #include <ZeroMQWidgetFactory.h>
+#include <QCoreApplication>
 
 SUSCAN_PLUGIN("ZeroMQ", "Redirect channels to ZeroMQ topics");
 SUSCAN_PLUGIN_VERSION(0, 1, 0);
@@ -29,6 +30,8 @@ bool
 plugin_load(Suscan::Plugin *plugin)
 {
   Suscan::Singleton *sus = Suscan::Singleton::get_instance();
+
+  Q_INIT_RESOURCE(zmq_icons);
 
   return sus->registerToolWidgetFactory(
         new SigDigger::ZeroMQWidgetFactory(plugin));

@@ -4,6 +4,16 @@ TEMPLATE = lib
 DEFINES += ZEROMQPLUGIN_LIBRARY
 
 CONFIG += c++11
+CONFIG += unversioned_libname unversioned_soname
+
+isEmpty(PLUGIN_DIRECTORY) {
+  _HOME = $$(HOME)
+  isEmpty(_HOME) {
+    error(Cannot deduce user home directory. Please provide a valid plugin installation path through the PLUGIN_DIRECTORY property)
+  }
+
+  PLUGIN_DIRECTORY=$$_HOME/.suscan/plugins
+}
 
 isEmpty(SUWIDGETS_PREFIX) {
   SUWIDGETS_INSTALL_HEADERS=$$[QT_INSTALL_HEADERS]/SuWidgets
@@ -49,12 +59,13 @@ CONFIG += c++11
 
 
 # Default rules for deployment.
-unix {
-    target.path = /usr/lib
-}
+target.path = $$PLUGIN_DIRECTORY
 !isEmpty(target.path): INSTALLS += target
 
 FORMS += \
   AddChanDialog.ui \
   AddMasterDialog.ui \
   ZeroMQWidget.ui
+
+RESOURCES += \
+  zmq_icons.qrc
