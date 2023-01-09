@@ -65,6 +65,7 @@ class ZeroMQConsumer : public ChannelConsumer
 public:
   ZeroMQConsumer(ZeroMQSink *, const char *type, SUFLOAT audioSampRate);
   SUFLOAT getSampRate() const;
+  std::string getChannelType() const;
 
   virtual void opened(
       Suscan::Analyzer *,

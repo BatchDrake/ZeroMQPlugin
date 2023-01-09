@@ -94,8 +94,10 @@ namespace SigDigger {
 
     bool doAddMaster(QString, SUFREQ, SUFLOAT, bool refresh = false);
     bool doAddChannel(QString, SUFREQ, SUFLOAT, QString, qint64, bool refresh = false);
+    bool doRemoveAll();
 
     // High-level logic
+
     void fwdAddMaster();
     void fwdAddChannel();
 
@@ -146,13 +148,13 @@ namespace SigDigger {
 
     void onTogglePublishing();
 
-
     void onLoadSettingsFailed(QString);
 
     void onFileMakeMaster(QString, SUFREQ, SUFLOAT);
     void onFileMakeChannel(QString, SUFREQ, SUFLOAT, QString, qint64);
 
     void onOpenSettings();
+    void onSaveSettings();
   };
 }
 

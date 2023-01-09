@@ -26,6 +26,16 @@ public:
 
   void abortLoad();
 
+  QString getZmqAddres() const;
+  bool getCorrectDC() const;
+  SUFREQ getTunerFreq() const;
+  SUFREQ getLNBFreq() const;
+
+  void setZmqAddress(QString);
+  void setCorrectDC(bool);
+  void setTunerFreq(SUFREQ);
+  void setLNBFreq(SUFREQ);
+
 signals:
   void loadError(QString);
 

@@ -139,6 +139,19 @@ ZeroMQConsumer::~ZeroMQConsumer()
     fclose(m_fp);
 }
 
+std::string
+ZeroMQConsumer::getChannelType() const
+{
+  return m_channelType;
+}
+
+
+SUFLOAT
+ZeroMQConsumer::getSampRate() const
+{
+  return m_sampRate;
+}
+
 unsigned int
 ZeroMQConsumer::calcBufLen() const
 {

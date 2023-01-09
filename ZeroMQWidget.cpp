@@ -265,6 +265,12 @@ ZeroMQWidget::connectAll()
         SLOT(onOpenSettings()));
 
   connect(
+        m_ui->saveButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onSaveSettings()));
+
+  connect(
         m_ui->trackTunerCheck,
         SIGNAL(toggled(bool)),
         this,
@@ -554,6 +560,29 @@ ZeroMQWidget::doAddMaster(QString qName, SUFREQ frequency, SUFLOAT bandwidth, bo
 }
 
 bool
+ZeroMQWidget::doRemoveAll()
+{
+  if (!m_forwarder->removeAll()) {
+    QMessageBox::critical(
+          this,
+          "Cannot clear channel list",
+          "Failed to remove all entries from the current tree. Some channels are still being opened.");
+    return false;
+  }
+
+  for (auto p : m_masterMarkers)
+    m_spectrum->removeChannel(p);
+
+  for (auto p : m_channelMarkers)
+    m_spectrum->removeChannel(p);
+
+  m_masterMarkers.clear();
+  m_channelMarkers.clear();
+
+  return true;
+}
+
+bool
 ZeroMQWidget::doAddChannel(
     QString qName,
     SUFREQ frequency,
@@ -779,9 +808,10 @@ ZeroMQWidget::onInspectorMessage(const Suscan::InspectorMessage &msg)
       QMessageBox::warning(
             this,
             "ZeroMQ forwarder",
-            "Multi-channel forwarder error: "
+            "Multi-channel forwarder disabled due to errors: "
             + QString::fromStdString(m_forwarder->getErrors()));
       m_forwarder->closeAll();
+      m_ui->togglePublishingButton->setChecked(false);
       recenterNamedChannels();
     }
 
@@ -894,22 +924,30 @@ ZeroMQWidget::onFileMakeChannel(
 void
 ZeroMQWidget::onOpenSettings()
 {
+  if (m_forwarder->begin() != m_forwarder->end()) {
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+          this,
+          "Load channels from file",
+          "The current list of channels will be cleared. Are you sure?",
+          QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No);
+
+    if (reply == QMessageBox::StandardButton::No) {
+      return;
+    }
+  }
+
   QString fileName = QFileDialog::getOpenFileName(
         this,
-        "Open ini file",
+        "Load channels form file",
         QDir().absolutePath(),
-        "SDRPlay INI settings (*.ini);;All files (*)");
+        "SDRReceiver INI settings (*.ini);;All files (*)");
 
   if (fileName.size() > 0) {
     std::string asStdString = fileName.toStdString();
 
-    if (!m_forwarder->removeAll()) {
-      QMessageBox::critical(
-            this,
-            "Cannot load settings file",
-            "Failed to remove all entries from the current tree. Some channels are still being opened.");
+    if (!doRemoveAll())
       return;
-    }
 
     if (!m_smanager->loadSettings(asStdString.c_str()))
       m_forwarder->removeAll();
@@ -917,6 +955,30 @@ ZeroMQWidget::onOpenSettings()
     m_treeModel->rebuildStructure();
     m_ui->treeView->expandAll();
     refreshUi();
+  }
+}
+
+void
+ZeroMQWidget::onSaveSettings()
+{
+  QString fileName = QFileDialog::getSaveFileName(
+        this,
+        "Save channels to file",
+        QDir().absolutePath(),
+        "SDRReceiver INI settings (*.ini);;All files (*)");
+
+  m_smanager->setZmqAddress(m_ui->urlEdit->text());
+  m_smanager->setTunerFreq(m_spectrum->getCenterFreq());
+  m_smanager->setLNBFreq(m_spectrum->getLnbFreq());
+
+  if (fileName.size() > 0) {
+    if (!m_smanager->saveSettings(fileName.toStdString().c_str(), m_forwarder)) {
+      QMessageBox::critical(
+            this,
+            "Cannot save settings to file",
+            "Failed to load channel list to file. Please verify directory permissions and try again.");
+
+    }
   }
 }
 

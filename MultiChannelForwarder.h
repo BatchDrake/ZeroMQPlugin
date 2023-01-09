@@ -45,6 +45,7 @@ struct MasterChannel;
 typedef std::list<ChannelDescription>::iterator ChannelListIterator;
 typedef std::list<MasterChannel *>::iterator MasterListIterator;
 typedef std::list<MasterChannel *>::const_iterator MasterListConstIterator;
+typedef std::unordered_map<std::string, ChannelDescription *>::const_iterator ChannelHashConstIterator;
 
 struct ChannelDescription {
   MasterChannel *parent;
@@ -163,6 +164,18 @@ public:
   cend() const
   {
     return masterList.cend();
+  }
+
+  ChannelHashConstIterator
+  cChanHashBegin() const
+  {
+    return channelHash.cbegin();
+  }
+
+  ChannelHashConstIterator
+  cChanHashEnd() const
+  {
+    return channelHash.cend();
   }
 
   MasterChannel *
