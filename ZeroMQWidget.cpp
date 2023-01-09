@@ -307,8 +307,8 @@ ZeroMQWidget::refreshUi()
 
   for (auto p = m_masterMarkers.begin(); p != m_masterMarkers.end(); ++p) {
     // Verify state of this master:
-    MasterChannel *master = m_forwarder->findMaster(p.key().c_str());
-    NamedChannelSetIterator it = p.value();
+    MasterChannel *master = m_forwarder->findMaster(p->first.c_str());
+    NamedChannelSetIterator it = p->second;
     NamedChannel *namCh   = it.value();
     QColor color;
 
@@ -327,8 +327,8 @@ ZeroMQWidget::refreshUi()
 
   for (auto p = m_channelMarkers.begin(); p != m_channelMarkers.end(); ++p) {
     // Verify state of this master:
-    ChannelDescription *chan = m_forwarder->findChannel(p.key().c_str());
-    NamedChannelSetIterator it = p.value();
+    ChannelDescription *chan = m_forwarder->findChannel(p->first.c_str());
+    NamedChannelSetIterator it = p->second;
     NamedChannel *namCh   = it.value();
     QColor color;
 
@@ -353,8 +353,8 @@ ZeroMQWidget::doRemoveMaster(MasterChannel *master)
   auto iter = m_masterMarkers.find(master->name);
 
   if (iter != m_masterMarkers.end()) {
-    m_spectrum->removeChannel(iter.value());
-    m_masterMarkers.remove(master->name);
+    m_spectrum->removeChannel(iter->second);
+    m_masterMarkers.erase(master->name);
   }
 
   // We also need to traverse all children belonging to this master
@@ -362,8 +362,8 @@ ZeroMQWidget::doRemoveMaster(MasterChannel *master)
   for (auto i = master->channels.begin(); i != master->channels.end(); ++i) {
     auto c = m_channelMarkers.find(i->name);
     if (c != m_channelMarkers.end()) {
-      m_spectrum->removeChannel(c.value());
-      m_channelMarkers.remove(c.key());
+      m_spectrum->removeChannel(c->second);
+      m_channelMarkers.erase(c->first);
     }
   }
 
@@ -383,8 +383,8 @@ ZeroMQWidget::doRemoveChannel(ChannelDescription *channel)
   auto iter = m_channelMarkers.find(channel->name);
 
   if (iter != m_channelMarkers.end()) {
-    m_spectrum->removeChannel(iter.value());
-    m_channelMarkers.remove(channel->name);
+    m_spectrum->removeChannel(iter->second);
+    m_channelMarkers.erase(channel->name);
   }
 
   // Remove from forwarder
@@ -468,7 +468,7 @@ ZeroMQWidget::lagNamedChannels()
       auto marker = m_masterMarkers.find(master->name);
 
       if (marker != m_masterMarkers.end()) {
-        auto it = marker.value();
+        auto it = marker->second;
         it.value()->frequency = master->frequency + diffFreq;
         m_spectrum->refreshChannel(it);
         m_masterMarkers[master->name] = it;
@@ -479,7 +479,7 @@ ZeroMQWidget::lagNamedChannels()
         auto channel = &*j;
 
         if (marker != m_channelMarkers.end()) {
-          auto it = marker.value();
+          auto it = marker->second;
           it.value()->frequency = master->frequency + channel->offset + diffFreq;
           m_spectrum->refreshChannel(it);
           m_channelMarkers[channel->name] = it;
@@ -497,7 +497,7 @@ ZeroMQWidget::recenterNamedChannels()
     auto marker = m_masterMarkers.find(master->name);
 
     if (marker != m_masterMarkers.end()) {
-      auto it = marker.value();
+      auto it = marker->second;
       it.value()->frequency = master->frequency;
       m_spectrum->refreshChannel(it);
       m_masterMarkers[master->name] = it;
@@ -508,7 +508,7 @@ ZeroMQWidget::recenterNamedChannels()
       auto channel = &*j;
 
       if (marker != m_channelMarkers.end()) {
-        auto it = marker.value();
+        auto it = marker->second;
         it.value()->frequency = master->frequency + channel->offset;
         m_spectrum->refreshChannel(it);
         m_channelMarkers[channel->name] = it;
@@ -571,10 +571,10 @@ ZeroMQWidget::doRemoveAll()
   }
 
   for (auto p : m_masterMarkers)
-    m_spectrum->removeChannel(p);
+    m_spectrum->removeChannel(p.second);
 
   for (auto p : m_channelMarkers)
-    m_spectrum->removeChannel(p);
+    m_spectrum->removeChannel(p.second);
 
   m_masterMarkers.clear();
   m_channelMarkers.clear();
@@ -884,7 +884,15 @@ ZeroMQWidget::onTogglePublishing()
 {
   if (m_ui->togglePublishingButton->isChecked()) {
     std::string asString = m_ui->urlEdit->text().toStdString();
-    m_zmqSink->bind(asString.c_str());
+    try {
+      m_zmqSink->bind(asString.c_str());
+    } catch (zmq::error_t &e) {
+      QMessageBox::warning(
+            this,
+            "Cannot bind to ZeroMQ address",
+            "Publishing disabled due to ZeroMQ errors: " + QString(e.what()));
+      m_ui->togglePublishingButton->setChecked(false);
+    }
   } else {
     m_zmqSink->disconnect();
   }

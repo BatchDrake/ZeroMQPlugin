@@ -22,7 +22,7 @@
 
 #include <ToolWidgetFactory.h>
 #include <QWidget>
-#include <QHash>
+#include <unordered_map>
 #include <MainSpectrum.h>
 
 namespace Ui {
@@ -84,8 +84,8 @@ namespace SigDigger {
     SUFREQ m_lastTunerFrequency = INFINITY; // Just an invalid value
 
     // Master channel markers
-    QHash<std::string, NamedChannelSetIterator> m_masterMarkers;
-    QHash<std::string, NamedChannelSetIterator> m_channelMarkers;
+    std::unordered_map<std::string, NamedChannelSetIterator> m_masterMarkers;
+    std::unordered_map<std::string, NamedChannelSetIterator> m_channelMarkers;
 
     void refreshUi();
 
