@@ -222,6 +222,10 @@ public:
   bool isPartiallyOpen() const;
   void setMaxBandwidth(SUFLOAT max);
 
+  // If track tuner is enabled, we call this periodically to update the
+  // LO of each master. No need to touch the channels.
+  void adjustLo();
+
   void setAnalyzer(Suscan::Analyzer *); // Used to update changes
   void openAll(); // Used to open all masters and channels
   void closeAll(); // Used to close all masters and channels
@@ -232,6 +236,8 @@ public:
   MasterChannel *makeMaster(const char *, SUFREQ freq, SUFLOAT bw);
   bool removeMaster(MasterListIterator);
   bool removeMaster(MasterChannel *);
+
+  bool removeAll();
 
   MasterListConstIterator findMaster(SUFREQ freq, SUFLOAT bw) const;
 

@@ -36,6 +36,7 @@ SOURCES += \
     AddMasterDialog.cpp \
     MultiChannelTreeModel.cpp \
     Registration.cpp \
+    SettingsManager.cpp \
     ZeroMQSink.cpp \
     ZeroMQWidget.cpp \
     ZeroMQWidgetFactory.cpp \
@@ -45,6 +46,7 @@ HEADERS += \
   AddChanDialog.h \
   AddMasterDialog.h \
   MultiChannelTreeModel.h \
+  SettingsManager.h \
   ZeroMQSink.h \
   ZeroMQWidget.h \
     ZeroMQWidgetFactory.h \

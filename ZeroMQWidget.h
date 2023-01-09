@@ -31,6 +31,7 @@ namespace Ui {
 
 class MultiChannelForwarder;
 class MultiChannelTreeModel;
+class SettingsManager;
 
 class MasterChannel;
 class ChannelDescription;
@@ -47,7 +48,10 @@ namespace SigDigger {
 
   class ZeroMQWidgetConfig : public Suscan::Serializable {
   public:
-    bool collapsed      = false;
+    bool collapsed       = false;
+    bool trackTuner      = true;
+    std::string zmqURL   = "tcp://*:6003";
+    bool startPublish   = false;
 
     // Overriden methods
     void deserialize(Suscan::Object const &conf) override;
@@ -66,6 +70,7 @@ namespace SigDigger {
     MultiChannelForwarder *m_forwarder = nullptr;
     MultiChannelTreeModel *m_treeModel = nullptr;
     ZeroMQSink *m_zmqSink = nullptr;
+    SettingsManager *m_smanager = nullptr;
 
     // UI members
     int m_state = 0;
@@ -73,6 +78,10 @@ namespace SigDigger {
     Ui::ZeroMQWidget *m_ui = nullptr;
     AddChanDialog *m_chanDialog = nullptr;
     AddMasterDialog *m_masterDialog = nullptr;
+    SUFREQ m_lastRefFrequency = 0; // Used to keep differences bewteen the
+                                   // original frequency and the current
+                                   // frequency
+    SUFREQ m_lastTunerFrequency = INFINITY; // Just an invalid value
 
     // Master channel markers
     QHash<std::string, NamedChannelSetIterator> m_masterMarkers;
@@ -83,17 +92,21 @@ namespace SigDigger {
     void doRemoveMaster(MasterChannel *);
     void doRemoveChannel(ChannelDescription *);
 
+    bool doAddMaster(QString, SUFREQ, SUFLOAT, bool refresh = false);
+    bool doAddChannel(QString, SUFREQ, SUFLOAT, QString, qint64, bool refresh = false);
+
     // High-level logic
     void fwdAddMaster();
     void fwdAddChannel();
-
-    void fwdOpenChannels();
-    void fwdCloseChannels();
 
     void applySpectrumState();
     void connectAll();
 
     void checkStartStop();
+
+    void checkRecentering();
+    void lagNamedChannels();
+    void recenterNamedChannels();
 
   public:
     ZeroMQWidget(ZeroMQWidgetFactory *, UIMediator *, QWidget *parent = nullptr);
@@ -112,6 +125,8 @@ namespace SigDigger {
     void setProfile(Suscan::Source::Config &) override;
 
   public slots:
+    void onURLChanged();
+    void onToggleTrackTuner();
     void onSpectrumBandwidthChanged();
     void onSpectrumLoChanged(qint64);
     void onSpectrumFrequencyChanged(qint64 freq);
@@ -130,6 +145,14 @@ namespace SigDigger {
     void onRemove();
 
     void onTogglePublishing();
+
+
+    void onLoadSettingsFailed(QString);
+
+    void onFileMakeMaster(QString, SUFREQ, SUFLOAT);
+    void onFileMakeChannel(QString, SUFREQ, SUFLOAT, QString, qint64);
+
+    void onOpenSettings();
   };
 }
 

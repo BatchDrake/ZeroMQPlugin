@@ -159,6 +159,21 @@ MultiChannelForwarder::setAnalyzer(Suscan::Analyzer *analyzer)
   m_analyzer = analyzer;
 }
 
+void
+MultiChannelForwarder::adjustLo()
+{
+  if (m_analyzer != nullptr) {
+    Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
+    SUFREQ tunerFreq = info.getFrequency();
+
+    for (auto p : masterList) {
+      SUFREQ lo = p->frequency - tunerFreq;
+      if (p->isOpen())
+        m_analyzer->setInspectorFreq(p->handle, lo);
+    }
+  }
+}
+
 bool
 MultiChannelForwarder::canOpen() const
 {
@@ -669,6 +684,25 @@ MultiChannelForwarder::findMaster(SUFREQ frequency, SUFLOAT bandwidth) const
   return cend();
 }
 
+bool
+MultiChannelForwarder::removeAll()
+{
+  bool immediate = true;
+
+  auto i = masterList.begin();
+
+  while (i != masterList.end()) {
+    auto next = std::next(i);
+
+    immediate = immediate && removeMaster(i);
+
+    i = next;
+  }
+
+  return immediate;
+}
+
+
 ChannelDescription *
 MultiChannelForwarder::makeChannel(
     const char *name,
@@ -687,7 +721,7 @@ MultiChannelForwarder::makeChannel(
   auto it = findMaster(freq, bw);
 
   if (it == cend()) {
-    error("Provided channel is outside any master channel.\n");
+    error("Channel `%s' is outside any master channel.\n", name);
     return nullptr;
   }
 

@@ -60,6 +60,7 @@ public:
   static MultiChannelTreeItem *indexData(const QModelIndex &);
   void fastExpand(QTreeView *);
   void rebuildStructure();
+
   MultiChannelTreeItem *allocItem(MultiChannelTreeItemType type);
 
   explicit MultiChannelTreeModel(MultiChannelForwarder *, QObject *parent = nullptr);

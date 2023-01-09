@@ -27,7 +27,9 @@
 #include <AddMasterDialog.h>
 #include <QMessageBox>
 #include <ZeroMQSink.h>
-
+#include <SettingsManager.h>
+#include <QFileDialog>
+#include <QDir>
 #include <UIMediator.h>
 #include <MainSpectrum.h>
 
@@ -43,6 +45,9 @@ void
 ZeroMQWidgetConfig::deserialize(Suscan::Object const &conf)
 {
   LOAD(collapsed);
+  LOAD(trackTuner);
+  LOAD(zmqURL);
+  LOAD(startPublish);
 }
 
 Suscan::Object &&
@@ -53,6 +58,9 @@ ZeroMQWidgetConfig::serialize()
   obj.setClass("ZeroMQWidgetConfig");
 
   STORE(collapsed);
+  STORE(trackTuner);
+  STORE(zmqURL);
+  STORE(startPublish);
 
   return persist(obj);
 }
@@ -70,6 +78,7 @@ ZeroMQWidget::ZeroMQWidget(
   m_spectrum  = mediator->getMainSpectrum();
   m_forwarder = new MultiChannelForwarder();
   m_treeModel = new MultiChannelTreeModel(m_forwarder);
+  m_smanager  = new SettingsManager(this);
 
   m_ui->treeView->setModel(m_treeModel);
 
@@ -92,6 +101,54 @@ ZeroMQWidget::~ZeroMQWidget()
   delete m_ui;
   delete m_forwarder;
   delete m_zmqSink;
+}
+
+// LO has changed. We have two choices here:
+//
+// 1. Track tuner is enabled. We call adjustLo() and update all
+//    opened masters accordingly.
+// 2. Track tuner is disabled. This is a slightly more complicated
+//    case:
+//    1. When the source starts, save the current frequency.
+//    2. When the frequency changes, if and only if it is running,
+//       update the named channels only, so they are in the right
+//       shifted frequency.
+//    3. When the source is stopped OR track tuner is enabled, shift
+//       shift named channels back to their corresponding position.
+void
+ZeroMQWidget::checkRecentering()
+{
+  if (m_analyzer != nullptr) {
+    Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
+    if (SU_ABS(m_lastTunerFrequency - info.getFrequency()) < 1)
+      return;
+
+    m_lastTunerFrequency = info.getFrequency();
+  }
+
+  if (m_forwarder->isOpen()) {
+    if (m_ui->trackTunerCheck->isChecked()) {
+      // TRACK TUNER
+      if (!m_forwarder->canOpen()) {
+        m_ui->togglePublishingButton->setChecked(false);
+        checkStartStop();
+
+        QMessageBox::warning(
+              this,
+              "Channels out of limits",
+              "Multichannel forwarder was automatically disabled, as the current source "
+              "frequency and sample rate cannot keep all channels opened at the same time. "
+              "You can open the channels again by recentering the source frequency to "
+              "a value close to "
+              + SuWidgetsHelpers::formatQuantity(m_forwarder->getCenter(), "Hz"));
+      } else {
+        m_forwarder->adjustLo();
+      }
+    } else {
+      // NO TRACK TUNER
+      lagNamedChannels();
+    }
+  }
 }
 
 void
@@ -117,6 +174,12 @@ ZeroMQWidget::applySpectrumState()
 void
 ZeroMQWidget::connectAll()
 {
+  connect(
+        m_ui->urlEdit,
+        SIGNAL(textChanged(QString)),
+        this,
+        SLOT(onURLChanged()));
+
   connect(
         m_ui->addAsMaster,
         SIGNAL(clicked(bool)),
@@ -176,6 +239,36 @@ ZeroMQWidget::connectAll()
         SIGNAL(currentChanged(QModelIndex,QModelIndex)),
         this,
         SLOT(onChangeCurrent()));
+
+  connect(
+        m_smanager,
+        SIGNAL(loadError(QString)),
+        this,
+        SLOT(onLoadSettingsFailed(QString)));
+
+  connect(
+        m_smanager,
+        SIGNAL(createMaster(QString,double,float)),
+        this,
+        SLOT(onFileMakeMaster(QString,double,float)));
+
+  connect(
+        m_smanager,
+        SIGNAL(createVFO(QString,double,float,QString,qint64)),
+        this,
+        SLOT(onFileMakeChannel(QString,double,float,QString,qint64)));
+
+  connect(
+        m_ui->openButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onOpenSettings()));
+
+  connect(
+        m_ui->trackTunerCheck,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onToggleTrackTuner()));
 }
 
 void
@@ -307,6 +400,7 @@ ZeroMQWidget::checkStartStop()
     if (!tryOpen) {
       // Close all
       m_forwarder->closeAll();
+      recenterNamedChannels();
       refreshUi();
     } else {
       if (!m_forwarder->canOpen()) {
@@ -344,63 +438,133 @@ ZeroMQWidget::checkStartStop()
                 + ".");
         }
       } else {
+        // Open All: use this as reference frequency
+        Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
+        m_lastRefFrequency = info.getFrequency();
         m_forwarder->openAll();
       }
     }
   }
 }
 
-void
-ZeroMQWidget::fwdAddMaster()
-{
-  QString qName = m_masterDialog->getName();
-  SUFREQ frequency = m_masterDialog->getFrequency();
-  SUFLOAT bandwidth = m_masterDialog->getBandwidth();
 
+void
+ZeroMQWidget::lagNamedChannels()
+{
+  // Lag Named Channels: move all master channels to the frequency
+  // they are due to changes in the LO frequency
+
+  if (m_analyzer != nullptr) {
+    Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
+    SUFREQ diffFreq = info.getFrequency() - m_lastRefFrequency;
+    for (auto i = m_forwarder->begin(); i != m_forwarder->end(); ++i) {
+      auto master = *i;
+      auto marker = m_masterMarkers.find(master->name);
+
+      if (marker != m_masterMarkers.end()) {
+        auto it = marker.value();
+        it.value()->frequency = master->frequency + diffFreq;
+        m_spectrum->refreshChannel(it);
+        m_masterMarkers[master->name] = it;
+      }
+
+      for (auto j = master->channels.begin(); j != master->channels.end(); ++j) {
+        auto marker = m_channelMarkers.find(j->name);
+        auto channel = &*j;
+
+        if (marker != m_channelMarkers.end()) {
+          auto it = marker.value();
+          it.value()->frequency = master->frequency + channel->offset + diffFreq;
+          m_spectrum->refreshChannel(it);
+          m_channelMarkers[channel->name] = it;
+        }
+      }
+    }
+  }
+}
+
+void
+ZeroMQWidget::recenterNamedChannels()
+{
+  for (auto i = m_forwarder->begin(); i != m_forwarder->end(); ++i) {
+    auto master = *i;
+    auto marker = m_masterMarkers.find(master->name);
+
+    if (marker != m_masterMarkers.end()) {
+      auto it = marker.value();
+      it.value()->frequency = master->frequency;
+      m_spectrum->refreshChannel(it);
+      m_masterMarkers[master->name] = it;
+    }
+
+    for (auto j = master->channels.begin(); j != master->channels.end(); ++j) {
+      auto marker = m_channelMarkers.find(j->name);
+      auto channel = &*j;
+
+      if (marker != m_channelMarkers.end()) {
+        auto it = marker.value();
+        it.value()->frequency = master->frequency + channel->offset;
+        m_spectrum->refreshChannel(it);
+        m_channelMarkers[channel->name] = it;
+      }
+    }
+  }
+}
+
+bool
+ZeroMQWidget::doAddMaster(QString qName, SUFREQ frequency, SUFLOAT bandwidth, bool refresh)
+{
   std::string name = qName.toStdString();
   MasterChannel *master = m_forwarder->makeMaster(
         name.c_str(),
         frequency,
         bandwidth);
 
-  if (master != nullptr) {
-    NamedChannelSetIterator it =
-        m_spectrum->addChannel(
-          qName,
-          frequency,
-          - bandwidth / 2,
-          + bandwidth / 2,
-          QColor(127, 127, 127),
-          QColor(127, 127, 127),
-          QColor(127, 127, 127));
-    it.value()->bandLike = true;
-    m_masterMarkers[name] = it;
-    m_spectrum->refreshChannel(it);
-
-    m_treeModel->rebuildStructure();
-    m_ui->treeView->expandAll();
-    refreshUi();
-  } else {
+  if (master == nullptr) {
     QString error = QString::fromStdString(m_forwarder->getErrors());
 
     QMessageBox::warning(
           this,
           "Failed to create master",
           "Master channel creation failed: " + error);
+
+    return false;
   }
+
+  NamedChannelSetIterator it =
+      m_spectrum->addChannel(
+        qName,
+        frequency,
+        - bandwidth / 2,
+        + bandwidth / 2,
+        QColor(127, 127, 127),
+        QColor(127, 127, 127),
+        QColor(127, 127, 127));
+  it.value()->bandLike = true;
+  m_masterMarkers[name] = it;
+  m_spectrum->refreshChannel(it);
+
+  if (refresh) {
+    m_treeModel->rebuildStructure();
+    m_ui->treeView->expandAll();
+    refreshUi();
+  }
+
+  return true;
 }
 
-void
-ZeroMQWidget::fwdAddChannel()
+bool
+ZeroMQWidget::doAddChannel(
+    QString qName,
+    SUFREQ frequency,
+    SUFLOAT bandwidth,
+    QString qChanType,
+    qint64 sampleRate,
+    bool refresh)
 {
-  QString qName = m_chanDialog->getName();
-  QString qChanType = m_chanDialog->getDemodType();
-  unsigned int sampRate = m_chanDialog->getSampleRate();
-  SUFREQ frequency = m_chanDialog->getAdjustedFrequency();
-  SUFLOAT bandwidth = m_chanDialog->getAdjustedBandwidth();
   std::string chanType = qChanType.toStdString();
   std::string inspClass = chanType == "raw" ? "raw" : "audio";
-
+  unsigned int sampRate = static_cast<unsigned>(sampleRate);
   std::string name = qName.toStdString();
 
   m_forwarder->clearErrors();
@@ -411,46 +575,63 @@ ZeroMQWidget::fwdAddChannel()
         inspClass.c_str(),
         new ZeroMQConsumer(m_zmqSink, chanType.c_str(), sampRate));
 
-  if (channel != nullptr) {
-    NamedChannelSetIterator it =
-        m_spectrum->addChannel(
-          qName,
-          frequency,
-          - bandwidth / 2,
-          + bandwidth / 2,
-          QColor(127, 127, 127),
-          QColor(127, 127, 127),
-          QColor(127, 127, 127));
-    it.value()->bandLike = false;
-    it.value()->nestLevel = 1;
-
-    m_channelMarkers[name] = it;
-    m_spectrum->refreshChannel(it);
-
-    m_treeModel->rebuildStructure();
-    m_ui->treeView->expandAll();
-    refreshUi();
-  } else {
+  if (channel == nullptr) {
     QString error = QString::fromStdString(m_forwarder->getErrors());
 
     QMessageBox::warning(
           this,
           "Failed to create channel",
           "Channel creation failed: " + error);
+    return false;
   }
+
+  NamedChannelSetIterator it =
+      m_spectrum->addChannel(
+        qName,
+        frequency,
+        - bandwidth / 2,
+        + bandwidth / 2,
+        QColor(127, 127, 127),
+        QColor(127, 127, 127),
+        QColor(127, 127, 127));
+  it.value()->bandLike = false;
+  it.value()->nestLevel = 1;
+
+  m_channelMarkers[name] = it;
+  m_spectrum->refreshChannel(it);
+
+  if (refresh) {
+    m_treeModel->rebuildStructure();
+    m_ui->treeView->expandAll();
+    refreshUi();
+  }
+
+  return true;
+}
+
+
+void
+ZeroMQWidget::fwdAddMaster()
+{
+  QString qName = m_masterDialog->getName();
+  SUFREQ frequency = m_masterDialog->getFrequency();
+  SUFLOAT bandwidth = m_masterDialog->getBandwidth();
+
+  doAddMaster(qName, frequency, bandwidth, true);
 }
 
 void
-ZeroMQWidget::fwdOpenChannels()
+ZeroMQWidget::fwdAddChannel()
 {
-  m_forwarder->openAll();
+  QString qName = m_chanDialog->getName();
+  QString qChanType = m_chanDialog->getDemodType();
+  unsigned int sampRate = m_chanDialog->getSampleRate();
+  SUFREQ frequency = m_chanDialog->getAdjustedFrequency();
+  SUFLOAT bandwidth = m_chanDialog->getAdjustedBandwidth();
+
+  doAddChannel(qName, frequency, bandwidth, qChanType, sampRate, true);
 }
 
-void
-ZeroMQWidget::fwdCloseChannels()
-{
-  m_forwarder->closeAll();;
-}
 
 // Overriden methods
 Suscan::Serializable *
@@ -463,6 +644,11 @@ void
 ZeroMQWidget::applyConfig()
 {
   setProperty("collapsed", m_panelConfig->collapsed);
+  m_ui->urlEdit->setText(QString::fromStdString(m_panelConfig->zmqURL));
+  m_ui->togglePublishingButton->setChecked(m_panelConfig->startPublish);
+  m_ui->trackTunerCheck->setChecked(m_panelConfig->trackTuner);
+
+  refreshUi();
 }
 
 bool
@@ -507,12 +693,19 @@ ZeroMQWidget::setState(int state, Suscan::Analyzer *analyzer)
     applySpectrumState();
   }
 
-  m_analyzer = analyzer;
-
   if (state != m_state)
     m_state = state;
 
-  m_forwarder->setAnalyzer(analyzer);
+  if (m_analyzer != analyzer) {
+    m_analyzer = analyzer;
+    m_lastTunerFrequency = INFINITY;
+
+    if (m_analyzer == nullptr)
+      recenterNamedChannels();
+
+    m_forwarder->setAnalyzer(analyzer);
+  }
+
   refreshUi();
   checkStartStop();
 }
@@ -554,9 +747,12 @@ ZeroMQWidget::onSpectrumLoChanged(qint64)
   applySpectrumState();
 }
 
+
 void
 ZeroMQWidget::onSpectrumFrequencyChanged(qint64)
 {
+  checkRecentering();
+
   applySpectrumState();
 }
 
@@ -569,6 +765,8 @@ ZeroMQWidget::onSourceInfoMessage(Suscan::SourceInfoMessage const &)
     m_haveSourceInfo = true;
     refreshUi();
   }
+
+  checkRecentering();
 }
 
 void
@@ -584,6 +782,7 @@ ZeroMQWidget::onInspectorMessage(const Suscan::InspectorMessage &msg)
             "Multi-channel forwarder error: "
             + QString::fromStdString(m_forwarder->getErrors()));
       m_forwarder->closeAll();
+      recenterNamedChannels();
     }
 
     refreshUi();
@@ -660,6 +859,83 @@ ZeroMQWidget::onTogglePublishing()
     m_zmqSink->disconnect();
   }
 
+  m_panelConfig->startPublish = m_ui->togglePublishingButton->isChecked();
   refreshUi();
   checkStartStop();
+}
+
+void
+ZeroMQWidget::onLoadSettingsFailed(QString error)
+{
+  QMessageBox::critical(
+        this,
+        "Cannot load settings file",
+        "Failed to load settings from file: " + error);
+}
+
+void
+ZeroMQWidget::onFileMakeMaster(QString masterName, SUFREQ freq, SUFLOAT bw)
+{
+  if (!doAddMaster(masterName, freq, bw))
+    m_smanager->abortLoad();
+}
+
+void
+ZeroMQWidget::onFileMakeChannel(
+    QString channelName,
+    SUFREQ freq,
+    SUFLOAT bw,
+    QString chanType,
+    qint64 rate)
+{
+  doAddChannel(channelName, freq, bw, chanType, rate);
+}
+
+void
+ZeroMQWidget::onOpenSettings()
+{
+  QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Open ini file",
+        QDir().absolutePath(),
+        "SDRPlay INI settings (*.ini);;All files (*)");
+
+  if (fileName.size() > 0) {
+    std::string asStdString = fileName.toStdString();
+
+    if (!m_forwarder->removeAll()) {
+      QMessageBox::critical(
+            this,
+            "Cannot load settings file",
+            "Failed to remove all entries from the current tree. Some channels are still being opened.");
+      return;
+    }
+
+    if (!m_smanager->loadSettings(asStdString.c_str()))
+      m_forwarder->removeAll();
+
+    m_treeModel->rebuildStructure();
+    m_ui->treeView->expandAll();
+    refreshUi();
+  }
+}
+
+void
+ZeroMQWidget::onToggleTrackTuner()
+{
+  if (m_ui->trackTunerCheck->isChecked()) {
+    recenterNamedChannels();
+  } else {
+    Suscan::AnalyzerSourceInfo info = m_analyzer->getSourceInfo();
+    m_lastRefFrequency = info.getFrequency();
+    lagNamedChannels();
+  }
+
+  m_panelConfig->trackTuner = m_ui->trackTunerCheck->isChecked();
+}
+
+void
+ZeroMQWidget::onURLChanged()
+{
+  m_panelConfig->zmqURL = m_ui->urlEdit->text().toStdString();
 }

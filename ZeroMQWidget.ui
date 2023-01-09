@@ -35,10 +35,16 @@
    </item>
    <item row="6" column="0" rowspan="2" colspan="4">
     <widget class="QWidget" name="widget" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>14</height>
+       <height>0</height>
       </size>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
@@ -60,10 +66,22 @@
       <item row="0" column="1">
        <widget class="QPushButton" name="saveButton">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>37</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="toolTip">
          <string>Save channel tree as...</string>
@@ -89,10 +107,22 @@
       <item row="0" column="4">
        <widget class="QPushButton" name="removeVFOButton">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>37</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="toolTip">
          <string>Remove selected</string>
@@ -118,10 +148,22 @@
       <item row="0" column="0">
        <widget class="QPushButton" name="openButton">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>37</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="toolTip">
          <string>Load channel tree from file</string>
@@ -147,10 +189,22 @@
       <item row="0" column="2">
        <widget class="QPushButton" name="addAsMaster">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>37</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="toolTip">
          <string>Add master channel</string>
@@ -176,10 +230,22 @@
       <item row="0" column="3">
        <widget class="QPushButton" name="addVFOButton">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>37</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="toolTip">
          <string>Add VFO</string>
@@ -204,6 +270,24 @@
       </item>
       <item row="0" column="5">
        <spacer name="horizontalSpacer">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>21</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
