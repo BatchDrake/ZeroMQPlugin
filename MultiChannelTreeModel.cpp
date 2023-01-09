@@ -19,6 +19,7 @@
 
 #include "MultiChannelTreeModel.h"
 #include <SuWidgetsHelpers.h>
+#include <ZeroMQSink.h>
 #include <QTreeView>
 
 MultiChannelTreeItem *
@@ -115,6 +116,8 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
           index.internalPointer());
     MasterChannel *master;
     ChannelDescription *channel;
+    const ZeroMQConsumer *consumer;
+    std::string type;
 
     if (role == Qt::DisplayRole) {
       switch (item->type) {
@@ -125,17 +128,17 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
             case 0:
               return QString::fromStdString(master->name);
 
-            case 1:
+            case 3:
               return SuWidgetsHelpers::formatQuantity(
                     master->frequency,
                     "Hz");
 
-            case 2:
+            case 1:
               return SuWidgetsHelpers::formatQuantity(
                     master->bandwidth,
                     "Hz");
 
-            case 3:
+            case 2:
               return "(Master)";
           }
 
@@ -143,23 +146,36 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
 
         case MULTI_CHANNEL_TREE_ITEM_CHANNEL:
           channel = item->channel;
+          consumer = static_cast<ZeroMQConsumer *>(channel->consumer);
+          type = consumer->getChannelType();
 
           switch (index.column()) {
             case 0:
               return QString::fromStdString(channel->name);
 
-            case 1:
+            case 3:
               return SuWidgetsHelpers::formatQuantity(
                     channel->offset + channel->parent->frequency,
                     "Hz");
 
-            case 2:
+            case 1:
               return SuWidgetsHelpers::formatQuantity(
-                    channel->bandwidth,
-                    "Hz");
+                    consumer->getSampRate(),
+                    "sps");
 
-            case 3:
-              return QString::fromStdString(channel->inspClass);
+            case 2:
+              if (type == "raw")
+                return QString("Raw I/Q");
+              else if (type == "audio:usb")
+                return QString("USB");
+              else if (type == "audio:lsb")
+                return QString("LSB");
+              else if (type == "audio:fm")
+                return QString("FM");
+              else if (type == "audio:am")
+                return QString("AM");
+              else
+                return "Unknown (class " + QString::fromStdString(channel->inspClass) + ")";
           }
           break;
 
@@ -192,13 +208,13 @@ MultiChannelTreeModel::headerData(
       case 0:
         return "Name";
 
-      case 1:
+      case 3:
         return "Frequency";
 
-      case 2:
-        return "Bandwidth";
+      case 1:
+        return "Rate";
 
-      case 3:
+      case 2:
         return "Modulation";
     }
   }
