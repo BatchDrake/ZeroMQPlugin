@@ -3,6 +3,8 @@
 
 #include <QSettings>
 
+#define EXTRA_BW_FACTOR 1.1
+
 template<typename ... arg>
 void
 SettingsManager::error(const char *fmt, arg ... args)
@@ -58,6 +60,7 @@ SettingsManager::loadSettings(const char *path)
     if (out_topic.size() == 0)
       out_topic = "MASTER_" + QString::number(i + 1);
     auto masterName   = out_topic.toStdString();
+    auto bandwidth    = vfo_out_rate * EXTRA_BW_FACTOR;
 
     if (vfo_freq == 0) {
       error(
@@ -73,7 +76,7 @@ SettingsManager::loadSettings(const char *path)
       return false;
     }
 
-    emit createMaster(out_topic, vfo_freq, vfo_out_rate);
+    emit createMaster(out_topic, vfo_freq, bandwidth);
   }
 
   settings.endArray();
@@ -126,6 +129,11 @@ SettingsManager::loadSettings(const char *path)
 
     if (filterbw == 0)
       filterbw = vfo_out_rate;
+
+    if (demod == "audio:usb")
+      vfo_freq += filterbw / 2;
+    else if (demod == "audio:lsb")
+      vfo_freq -= filterbw / 2;
 
     emit createVFO(out_topic, vfo_freq, filterbw, demod, vfo_out_rate);
   }
