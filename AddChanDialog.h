@@ -36,15 +36,16 @@ namespace SigDigger {
   {
     Q_OBJECT
 
-    unsigned int m_lastRate = 192000;
     MultiChannelForwarder *m_forwarder = nullptr;
-    QVector<unsigned> m_sampleRates;
+    SUFREQ m_nativeRate = 1e6;
     MainSpectrum::Skewness m_savedSkewness;
     MainSpectrum *m_spectrum;
 
-    void connectAll();
-    void refreshUi();
-    void populateRates();
+    void    connectAll();
+    void    refreshUi();
+    void    populateRates();
+    void    refreshDecimationLimits();
+    void    refreshRateUiState();
 
   public:
     explicit AddChanDialog(
@@ -54,6 +55,8 @@ namespace SigDigger {
 
     void hideEvent(QHideEvent *) override;
     void showEvent(QShowEvent *) override;
+
+    void setNativeRate(SUFREQ);
 
     void setFrequency(SUFREQ);
     void setBandwidth(SUFLOAT);

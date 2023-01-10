@@ -20,6 +20,7 @@
 #include "AddChanDialog.h"
 #include "ui_AddChanDialog.h"
 #include "MultiChannelForwarder.h"
+#include "SuWidgetsHelpers.h"
 #include <QPushButton>
 
 using namespace SigDigger;
@@ -36,7 +37,6 @@ AddChanDialog::AddChanDialog(
   m_forwarder = fw;
   m_spectrum = spectrum;
 
-  ui->sampleRateCombo->clear();
   ui->demodTypeCombo->clear();
 
   ui->demodTypeCombo->addItem("Raw IQ", QVariant::fromValue<QString>("raw"));
@@ -46,21 +46,12 @@ AddChanDialog::AddChanDialog(
   ui->demodTypeCombo->addItem("Audio (LSB)", QVariant::fromValue<QString>("audio:lsb"));
 
   ui->demodTypeCombo->setCurrentIndex(3);
+  ui->manualRateSpin->setUnits("sps");
 
-#define ADD_SAMP_RATE(x) m_sampleRates.push_back(x)
+  setNativeRate(1e6);
 
-  ADD_SAMP_RATE(8000);
-  ADD_SAMP_RATE(16000);
-  ADD_SAMP_RATE(24000);
-  ADD_SAMP_RATE(25000);
-  ADD_SAMP_RATE(32000);
-  ADD_SAMP_RATE(44100);
-  ADD_SAMP_RATE(48000);
-  ADD_SAMP_RATE(96000);
-  ADD_SAMP_RATE(192000);
-
-#undef ADD_SAMP_RATE
-
+  ui->decimationRadio->setChecked(true);
+  refreshRateUiState();
   refreshUi();
   connectAll();
 }
@@ -68,6 +59,56 @@ AddChanDialog::AddChanDialog(
 AddChanDialog::~AddChanDialog()
 {
   delete ui;
+}
+
+void
+AddChanDialog::refreshRateUiState()
+{
+  bool decim = ui->decimationRadio->isChecked();
+
+  ui->decimationSpin->setEnabled(decim);
+  ui->decimatedRateLabel->setEnabled(decim);
+  ui->manualRateSpin->setEnabled(!decim);
+
+  if (decim) {
+    ui->decimatedRateLabel->setText(
+          SuWidgetsHelpers::formatQuantity(getSampleRate(), "sps"));
+    ui->manualRateSpin->setValue(getSampleRate());
+  }
+}
+
+void
+AddChanDialog::refreshDecimationLimits()
+{
+  unsigned int minimum = 0;
+  SUFREQ rate = m_nativeRate;
+  SUFLOAT bandwidth = getBandwidth();
+
+  while (rate > bandwidth) {
+    ++minimum;
+    rate *= .5;
+  }
+
+  ui->decimationSpin->setMinimum(1 << minimum);
+  ui->decimationSpin->setMaximum(rate);
+
+  ui->decimationSpin->setValue(1 << minimum);
+
+  ui->manualRateSpin->setMinimum(1);
+  ui->manualRateSpin->setMaximum(bandwidth);
+}
+
+void
+AddChanDialog::setNativeRate(SUFREQ rate)
+{
+  if (!sufeq(rate, m_nativeRate, 1)) {
+    m_nativeRate = rate;
+    ui->sourceRateLabel->setText(SuWidgetsHelpers::formatQuantity(rate, "sps"));
+
+    // Find minimum decimation
+    refreshRateUiState();
+    refreshDecimationLimits();
+  }
 }
 
 void
@@ -111,33 +152,6 @@ AddChanDialog::getAdjustedBandwidth() const
 }
 
 void
-AddChanDialog::populateRates()
-{
-  SUFLOAT bandwidth = getBandwidth();
-
-  if (bandwidth > 0) {
-    unsigned savedRate = m_lastRate;
-    int index = -1;
-
-    ui->sampleRateCombo->clear();
-
-    for (auto rate : m_sampleRates) {
-      if (rate < bandwidth) {
-        if (rate <= savedRate)
-          index = ui->sampleRateCombo->count();
-
-        ui->sampleRateCombo->addItem(
-              QString::number(rate),
-              QVariant::fromValue<unsigned>(rate));
-      }
-    }
-
-    if (index != -1)
-      ui->sampleRateCombo->setCurrentIndex(index);
-  }
-}
-
-void
 AddChanDialog::connectAll()
 {
   connect(
@@ -153,8 +167,26 @@ AddChanDialog::connectAll()
         SLOT(onBwChanged()));
 
   connect(
-        ui->demodTypeCombo,
-        SIGNAL(activated(int)),
+        ui->decimationRadio,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onSampleRateChanged()));
+
+  connect(
+        ui->decimationSpin,
+        SIGNAL(valueChanged(int)),
+        this,
+        SLOT(onSampleRateChanged()));
+
+  connect(
+        ui->manualRateSpin,
+        SIGNAL(valueChanged(qreal)),
+        this,
+        SLOT(onSampleRateChanged()));
+
+  connect(
+        ui->manualRadio,
+        SIGNAL(toggled(bool)),
         this,
         SLOT(onSampleRateChanged()));
 
@@ -179,7 +211,7 @@ AddChanDialog::refreshUi()
 
   it = m_forwarder->findMaster(frequency, bandwidth);
 
-  ui->sampleRateCombo->setEnabled(isAudio);
+  ui->groupBox->setEnabled(isAudio);
 
   if (isVisible()) {
     MainSpectrum::Skewness skewness = MainSpectrum::Skewness::SYMMETRIC;
@@ -193,9 +225,6 @@ AddChanDialog::refreshUi()
 
   if (it == m_forwarder->cend()) {
     ui->masterLabel->setText("Invalid (outside master limits)");
-    ui->masterLabel->setStyleSheet("color: red");
-  } else if (ui->sampleRateCombo->count() == 0 && isAudio) {
-    ui->masterLabel->setText("Invalid (bandwidth below 8 kHz)");
     ui->masterLabel->setStyleSheet("color: red");
   } else if (
              name.size() == 0
@@ -226,7 +255,9 @@ AddChanDialog::setBandwidth(SUFLOAT bw)
 {
   ui->bandwidthSpinBox->setValue(bw);
 
-  populateRates();
+  refreshDecimationLimits();
+  refreshRateUiState();
+
   refreshUi();
 }
 
@@ -254,10 +285,12 @@ AddChanDialog::getDemodType() const
 unsigned
 AddChanDialog::getSampleRate() const
 {
-  if (ui->sampleRateCombo->currentIndex() == -1)
-    return 0;
+  bool decim = ui->decimationRadio->isChecked();
 
-  return ui->sampleRateCombo->currentData().value<unsigned>();
+  if (decim)
+    return m_nativeRate / ui->decimationSpin->value();
+  else
+    return ui->manualRateSpin->value();
 }
 
 QString
@@ -328,17 +361,13 @@ AddChanDialog::onChanEdited()
 void
 AddChanDialog::onBwChanged()
 {
-  populateRates();
+  refreshDecimationLimits();
+  refreshRateUiState();
   refreshUi();
 }
 
 void
 AddChanDialog::onSampleRateChanged()
 {
-  int rate = getSampleRate();
-
-  if (rate != 0)
-    m_lastRate = rate;
-
-  refreshUi();
+  refreshRateUiState();
 }

@@ -758,9 +758,9 @@ ZeroMQWidget::setTimeStamp(struct timeval const &)
 }
 
 void
-ZeroMQWidget::setProfile(Suscan::Source::Config &)
+ZeroMQWidget::setProfile(Suscan::Source::Config &profile)
 {
-  // TODO
+  m_chanDialog->setNativeRate(profile.getSampleRate());
 }
 
 //////////////////////////////// Slots ////////////////////////////////////////
@@ -786,12 +786,13 @@ ZeroMQWidget::onSpectrumFrequencyChanged(qint64)
 }
 
 void
-ZeroMQWidget::onSourceInfoMessage(Suscan::SourceInfoMessage const &)
+ZeroMQWidget::onSourceInfoMessage(Suscan::SourceInfoMessage const &info)
 {
   if (!m_haveSourceInfo) {
    // TODO
 
     m_haveSourceInfo = true;
+    m_chanDialog->setNativeRate(info.info()->getSampleRate());
     refreshUi();
   }
 
