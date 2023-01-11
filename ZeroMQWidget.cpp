@@ -248,15 +248,15 @@ ZeroMQWidget::connectAll()
 
   connect(
         m_smanager,
-        SIGNAL(createMaster(QString,double,float)),
+        SIGNAL(createMaster(QString,double,float,bool)),
         this,
-        SLOT(onFileMakeMaster(QString,double,float)));
+        SLOT(onFileMakeMaster(QString,double,float,bool)));
 
   connect(
         m_smanager,
-        SIGNAL(createVFO(QString,double,float,QString,qint64)),
+        SIGNAL(createVFO(QString,double,float,QString,qint64,bool)),
         this,
-        SLOT(onFileMakeChannel(QString,double,float,QString,qint64)));
+        SLOT(onFileMakeChannel(QString,double,float,QString,qint64,bool)));
 
   connect(
         m_ui->openButton,
@@ -544,13 +544,20 @@ ZeroMQWidget::recenterNamedChannels()
 }
 
 bool
-ZeroMQWidget::doAddMaster(QString qName, SUFREQ frequency, SUFLOAT bandwidth, bool refresh)
+ZeroMQWidget::doAddMaster(
+    QString qName,
+    SUFREQ frequency,
+    SUFLOAT bandwidth,
+    bool enabled,
+    bool refresh)
 {
   std::string name = qName.toStdString();
   MasterChannel *master = m_forwarder->makeMaster(
         name.c_str(),
         frequency,
         bandwidth);
+
+  master->setEnabled(enabled);
 
   if (master == nullptr) {
     QString error = QString::fromStdString(m_forwarder->getErrors());
@@ -615,6 +622,7 @@ ZeroMQWidget::doAddChannel(
     SUFLOAT bandwidth,
     QString qChanType,
     qint64 sampleRate,
+    bool enabled,
     bool refresh)
 {
   std::string chanType = qChanType.toStdString();
@@ -629,6 +637,8 @@ ZeroMQWidget::doAddChannel(
         bandwidth,
         inspClass.c_str(),
         new ZeroMQConsumer(m_zmqSink, chanType.c_str(), sampRate));
+
+  channel->consumer->setEnabled(enabled);
 
   if (channel == nullptr) {
     QString error = QString::fromStdString(m_forwarder->getErrors());
@@ -672,7 +682,7 @@ ZeroMQWidget::fwdAddMaster()
   SUFREQ frequency = m_masterDialog->getFrequency();
   SUFLOAT bandwidth = m_masterDialog->getBandwidth();
 
-  doAddMaster(qName, frequency, bandwidth, true);
+  doAddMaster(qName, frequency, bandwidth, true, true);
 }
 
 void
@@ -684,7 +694,7 @@ ZeroMQWidget::fwdAddChannel()
   SUFREQ frequency = m_chanDialog->getAdjustedFrequency();
   SUFLOAT bandwidth = m_chanDialog->getAdjustedBandwidth();
 
-  doAddChannel(qName, frequency, bandwidth, qChanType, sampRate, true);
+  doAddChannel(qName, frequency, bandwidth, qChanType, sampRate, true, true);
 }
 
 
@@ -939,9 +949,13 @@ ZeroMQWidget::onLoadSettingsFailed(QString error)
 }
 
 void
-ZeroMQWidget::onFileMakeMaster(QString masterName, SUFREQ freq, SUFLOAT bw)
+ZeroMQWidget::onFileMakeMaster(
+    QString masterName,
+    SUFREQ freq,
+    SUFLOAT bw,
+    bool enabled)
 {
-  if (!doAddMaster(masterName, freq, bw))
+  if (!doAddMaster(masterName, freq, bw, enabled))
     m_smanager->abortLoad();
 }
 
@@ -951,9 +965,10 @@ ZeroMQWidget::onFileMakeChannel(
     SUFREQ freq,
     SUFLOAT bw,
     QString chanType,
-    qint64 rate)
+    qint64 rate,
+    bool enabled)
 {
-  doAddChannel(channelName, freq, bw, chanType, rate);
+  doAddChannel(channelName, freq, bw, chanType, rate, enabled);
 }
 
 void

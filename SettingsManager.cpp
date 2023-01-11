@@ -71,6 +71,8 @@ SettingsManager::loadSettings(const char *path)
     auto vfo_out_rate = settings.value("out_rate").value<qint64>();
     auto vfo_freq     = settings.value("frequency").value<qint64>();
     auto out_topic    = settings.value("zmq_topic").value<QString>();
+    bool disabled     = settings.value("SigDigger.disabled").value<bool>();
+
     if (out_topic.size() == 0)
       out_topic = "MASTER_" + QString::number(i + 1);
     auto masterName   = out_topic.toStdString();
@@ -90,7 +92,7 @@ SettingsManager::loadSettings(const char *path)
       return false;
     }
 
-    emit createMaster(out_topic, vfo_freq, bandwidth);
+    emit createMaster(out_topic, vfo_freq, bandwidth, !disabled);
   }
 
   settings.endArray();
@@ -111,6 +113,7 @@ SettingsManager::loadSettings(const char *path)
     auto demod        = settings.value("SigDigger.demod").value<QString>();
     auto vfo_out_rate = settings.value("out_rate").value<qint64>();
     auto data_rate    = settings.value("data_rate").value<qint64>();
+    bool disabled     = settings.value("SigDigger.disabled").value<bool>();
     auto channelName  = out_topic.toStdString();
 
     // Assume USB if not present
@@ -149,7 +152,7 @@ SettingsManager::loadSettings(const char *path)
     else if (demod == "audio:lsb")
       vfo_freq -= filterbw / 2;
 
-    emit createVFO(out_topic, vfo_freq, filterbw, demod, vfo_out_rate);
+    emit createVFO(out_topic, vfo_freq, filterbw, demod, vfo_out_rate, !disabled);
   }
 
   if (m_aborted)
@@ -229,6 +232,7 @@ SettingsManager::saveSettings(const char *path, const MultiChannelForwarder *fwd
     settings.setValue("frequency", static_cast<qint64>(master->frequency));
     settings.setValue("out_rate", static_cast<qint64>(master->bandwidth / EXTRA_BW_FACTOR));
     settings.setValue("out_topic", QString::fromStdString(master->name));
+    settings.setValue("SigDigger.disabled", !master->enabled);
   }
 
   settings.endArray();
@@ -256,6 +260,7 @@ SettingsManager::saveSettings(const char *path, const MultiChannelForwarder *fwd
     settings.setValue("topic", QString::fromStdString(channel->name));
     settings.setValue("SigDigger.demod", demod);
     settings.setValue("out_rate", static_cast<qint64>(consumer->getSampRate()));
+    settings.setValue("SigDigger.disabled", !consumer->isEnabled());
   }
 
   settings.endArray();

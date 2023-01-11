@@ -95,8 +95,8 @@ namespace SigDigger {
     void doRemoveMaster(MasterChannel *);
     void doRemoveChannel(ChannelDescription *);
 
-    bool doAddMaster(QString, SUFREQ, SUFLOAT, bool refresh = false);
-    bool doAddChannel(QString, SUFREQ, SUFLOAT, QString, qint64, bool refresh = false);
+    bool doAddMaster(QString, SUFREQ, SUFLOAT, bool enabled = true, bool refresh = false);
+    bool doAddChannel(QString, SUFREQ, SUFLOAT, QString, qint64,  bool enabled = true, bool refresh = false);
     bool doRemoveAll();
 
     // High-level logic
@@ -153,8 +153,8 @@ namespace SigDigger {
 
     void onLoadSettingsFailed(QString);
 
-    void onFileMakeMaster(QString, SUFREQ, SUFLOAT);
-    void onFileMakeChannel(QString, SUFREQ, SUFLOAT, QString, qint64);
+    void onFileMakeMaster(QString, SUFREQ, SUFLOAT, bool);
+    void onFileMakeChannel(QString, SUFREQ, SUFLOAT, QString, qint64, bool);
 
     void onOpenSettings();
     void onSaveSettings();

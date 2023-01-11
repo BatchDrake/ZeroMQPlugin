@@ -39,8 +39,8 @@ public:
 signals:
   void loadError(QString);
 
-  void createMaster(QString, SUFREQ, SUFLOAT);
-  void createVFO(QString, SUFREQ, SUFLOAT, QString, qint64);
+  void createMaster(QString, SUFREQ, SUFLOAT, bool);
+  void createVFO(QString, SUFREQ, SUFLOAT, QString, qint64, bool);
 };
 
 #endif // SETTINGSMANAGER_H
