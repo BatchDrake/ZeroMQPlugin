@@ -27,6 +27,7 @@
 #include <unordered_map>
 
 struct ChannelDescription;
+class MultiChannelForwarder;
 
 class ChannelConsumer {
 public:
@@ -75,6 +76,7 @@ struct ChannelDescription {
 };
 
 struct MasterChannel {
+  MultiChannelForwarder *owner;
   std::string    name;
   SUFREQ         frequency;
   SUFLOAT        bandwidth;
@@ -84,9 +86,12 @@ struct MasterChannel {
   MasterListIterator  iter;
   Suscan::Handle     handle  = SUSCAN_INVALID_HANDLE_VALUE;
   Suscan::RequestId  reqId;
+  Suscan::Config     config;
   bool               opening = false;
   unsigned int       open_count = 0;
   bool               deleted = false;
+
+  void setEnabled(bool);
 
   inline bool
   isOpen() const
@@ -122,7 +127,10 @@ class MultiChannelForwarder
   // This is a map that enumerates opened masters
   std::map<Suscan::Handle, MasterChannel *> masterMap;
   std::map<Suscan::RequestId, MasterChannel *> pendingMasterMap;
-  bool promoteMaster(Suscan::RequestId, Suscan::Handle);
+  bool promoteMaster(
+      Suscan::RequestId,
+      Suscan::Handle,
+      const suscan_config_t *);
 
   // This is a map that relates opened channels with consumers
   std::map<Suscan::Handle, ChannelDescription *> channelMap;
@@ -240,6 +248,8 @@ public:
   // If track tuner is enabled, we call this periodically to update the
   // LO of each master. No need to touch the channels.
   void adjustLo();
+
+  void updateMasterConfig(MasterChannel *);
 
   void setAnalyzer(Suscan::Analyzer *); // Used to update changes
   void openAll(); // Used to open all masters and channels

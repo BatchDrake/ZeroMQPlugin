@@ -32,6 +32,19 @@ ChannelDescription::~ChannelDescription()
   delete consumer;
 }
 
+void
+MasterChannel::setEnabled(bool enabled)
+{
+  if (this->enabled != enabled) {
+    if (isOpen()) {
+      config.set("mc.enabled", enabled);
+      owner->updateMasterConfig(this);
+    }
+
+    this->enabled = enabled;
+  }
+}
+
 ChannelListIterator
 MultiChannelForwarder::deleteChannel(ChannelListIterator it)
 {
@@ -142,6 +155,13 @@ MultiChannelForwarder::reset()
   m_opening = false;
   m_opened = false;
   clearErrors();
+}
+
+void
+MultiChannelForwarder::updateMasterConfig(MasterChannel *master)
+{
+  if (m_analyzer != nullptr && master->isOpen())
+    m_analyzer->setInspectorConfig(master->handle, master->config);
 }
 
 void
@@ -279,7 +299,10 @@ MultiChannelForwarder::getChannelFromHandle(Suscan::Handle reqId) const
   return it->second;
 }
 bool
-MultiChannelForwarder::promoteMaster(Suscan::RequestId reqId, Suscan::Handle hnd)
+MultiChannelForwarder::promoteMaster(
+    Suscan::RequestId reqId,
+    Suscan::Handle hnd,
+    const suscan_config_t *cfg)
 {
   MasterChannel *master;
 
@@ -312,8 +335,12 @@ MultiChannelForwarder::promoteMaster(Suscan::RequestId reqId, Suscan::Handle hnd
 
   master->handle  = hnd;
   master->opening = false;
+  master->config  = Suscan::Config(cfg);
 
   masterMap[hnd]  = master;
+
+  if (!master->enabled)
+    updateMasterConfig(master);
 
   return true;
 }
@@ -526,7 +553,10 @@ MultiChannelForwarder::processMessage(Suscan::InspectorMessage const &msg)
         // 3. If not, find channel
         // 4. If found, promote
         // 5. If anything was opened, check if we must transit to opened
-        if (!promoteMaster(msg.getRequestId(), msg.getHandle())) {
+        if (!promoteMaster(
+              msg.getRequestId(),
+              msg.getHandle(),
+              msg.getCConfig())) {
           ch = getChannelFromRequest(msg.getRequestId());
           if (ch != nullptr) {
             if (promoteChannel(msg.getRequestId(), msg.getHandle())) {
@@ -606,6 +636,7 @@ MultiChannelForwarder::makeMaster(const char *name, SUFREQ frequency, SUFLOAT ba
 
   MasterChannel *master = new MasterChannel;
 
+  master->owner     = this;
   master->name      = name;
   master->frequency = frequency;
   master->bandwidth = bandwidth;

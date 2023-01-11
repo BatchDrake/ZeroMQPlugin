@@ -215,15 +215,14 @@ bool
 MultiChannelTreeModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
   if (index.isValid()) {
-    MultiChannelTreeItem *childItem = static_cast<MultiChannelTreeItem*>(
-          index.internalPointer());
+    MultiChannelTreeItem *childItem = indexData(index);
     if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
       bool enabled = value.value<Qt::CheckState>() == Qt::CheckState::Checked;
 
       if (childItem->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
         childItem->channel->enabled = enabled;
       else if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
-        childItem->master->enabled = enabled;
+        childItem->master->setEnabled(enabled);
 
       emit dataChanged(index, index);
     }
