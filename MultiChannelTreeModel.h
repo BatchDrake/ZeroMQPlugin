@@ -43,7 +43,6 @@ struct MultiChannelTreeItem
   };
 
   MultiChannelTreeItem *parent = nullptr;
-  bool enabled = true;
   int index = -1;
   QVector<MultiChannelTreeItem *> children;
 };

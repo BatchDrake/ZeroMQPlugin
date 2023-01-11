@@ -129,7 +129,14 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
 
     if (role == Qt::CheckStateRole) {
       if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
-        return item->enabled ? Qt::CheckState::Checked : Qt::CheckState::Unchecked;
+        bool enabled = false;
+
+        if (item->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
+          enabled = item->channel->enabled;
+        else if (item->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
+          enabled = item->master->enabled;
+
+        return enabled ? Qt::CheckState::Checked : Qt::CheckState::Unchecked;
       } else {
         return QVariant();
       }
@@ -211,12 +218,12 @@ MultiChannelTreeModel::setData(const QModelIndex &index, const QVariant &value, 
     MultiChannelTreeItem *childItem = static_cast<MultiChannelTreeItem*>(
           index.internalPointer());
     if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
-      childItem->enabled = value.value<Qt::CheckState>() == Qt::CheckState::Checked;
+      bool enabled = value.value<Qt::CheckState>() == Qt::CheckState::Checked;
 
       if (childItem->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
-        childItem->channel->enabled = childItem->enabled;
+        childItem->channel->enabled = enabled;
       else if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
-        childItem->master->enabled = childItem->enabled;
+        childItem->master->enabled = enabled;
 
       emit dataChanged(index, index);
     }
