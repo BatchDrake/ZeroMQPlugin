@@ -43,6 +43,7 @@ struct MultiChannelTreeItem
   };
 
   MultiChannelTreeItem *parent = nullptr;
+  bool enabled = true;
   int index = -1;
   QVector<MultiChannelTreeItem *> children;
 };
@@ -67,6 +68,7 @@ public:
 
   ~MultiChannelTreeModel();
 
+  bool setData(const QModelIndex & index, const QVariant & value, int role = Qt::EditRole);
   QVariant data(const QModelIndex &index, int role) const override;
   Qt::ItemFlags flags(const QModelIndex &index) const override;
   QVariant headerData(int section, Qt::Orientation orientation,

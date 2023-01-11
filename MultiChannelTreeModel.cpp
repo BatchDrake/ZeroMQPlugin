@@ -22,6 +22,14 @@
 #include <ZeroMQSink.h>
 #include <QTreeView>
 
+
+#define ZMQ_TREEMODEL_COL_NAME      0
+#define ZMQ_TREEMODEL_COL_BANDWIDTH 1
+#define ZMQ_TREEMODEL_COL_TYPE      2
+#define ZMQ_TREEMODEL_COL_FREQUENCY 3
+
+#define ZMQ_TREEMODEL_COUNT (ZMQ_TREEMODEL_COL_FREQUENCY + 1)
+
 MultiChannelTreeItem *
 MultiChannelTreeModel::indexData(const QModelIndex &index)
 {
@@ -119,26 +127,34 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
     const ZeroMQConsumer *consumer;
     std::string type;
 
+    if (role == Qt::CheckStateRole) {
+      if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
+        return item->enabled ? Qt::CheckState::Checked : Qt::CheckState::Unchecked;
+      } else {
+        return QVariant();
+      }
+    }
+
     if (role == Qt::DisplayRole) {
       switch (item->type) {
         case MULTI_CHANNEL_TREE_ITEM_MASTER:
           master = item->master;
 
           switch (index.column()) {
-            case 0:
+            case ZMQ_TREEMODEL_COL_NAME:
               return QString::fromStdString(master->name);
 
-            case 3:
+            case ZMQ_TREEMODEL_COL_FREQUENCY:
               return SuWidgetsHelpers::formatQuantity(
                     master->frequency,
                     "Hz");
 
-            case 1:
+            case ZMQ_TREEMODEL_COL_BANDWIDTH:
               return SuWidgetsHelpers::formatQuantity(
                     master->bandwidth,
                     "Hz");
 
-            case 2:
+            case ZMQ_TREEMODEL_COL_TYPE:
               return "(Master)";
           }
 
@@ -150,20 +166,20 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
           type = consumer->getChannelType();
 
           switch (index.column()) {
-            case 0:
+            case ZMQ_TREEMODEL_COL_NAME:
               return QString::fromStdString(channel->name);
 
-            case 3:
+            case ZMQ_TREEMODEL_COL_FREQUENCY:
               return SuWidgetsHelpers::formatQuantity(
                     channel->offset + channel->parent->frequency,
                     "Hz");
 
-            case 1:
+            case ZMQ_TREEMODEL_COL_BANDWIDTH:
               return SuWidgetsHelpers::formatQuantity(
                     consumer->getSampRate(),
                     "sps");
 
-            case 2:
+            case ZMQ_TREEMODEL_COL_TYPE:
               if (type == "raw")
                 return QString("Raw I/Q");
               else if (type == "audio:usb")
@@ -188,13 +204,48 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
   return QVariant();
 }
 
+bool
+MultiChannelTreeModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+  if (index.isValid()) {
+    MultiChannelTreeItem *childItem = static_cast<MultiChannelTreeItem*>(
+          index.internalPointer());
+    if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
+      childItem->enabled = value.value<Qt::CheckState>() == Qt::CheckState::Checked;
+
+      if (childItem->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
+        childItem->channel->enabled = childItem->enabled;
+      else if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
+        childItem->master->enabled = childItem->enabled;
+
+      emit dataChanged(index, index);
+    }
+  }
+
+  return QAbstractItemModel::setData(index, value, role);
+}
+
 Qt::ItemFlags
 MultiChannelTreeModel::flags(const QModelIndex &index) const
 {
   if (!index.isValid())
       return Qt::NoItemFlags;
 
-  return QAbstractItemModel::flags(index);
+  auto flags = QAbstractItemModel::flags(index);
+
+  MultiChannelTreeItem *childItem = static_cast<MultiChannelTreeItem*>(
+        index.internalPointer());
+
+  if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
+    flags |= Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
+
+    if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
+      flags |= Qt::ItemIsAutoTristate;
+
+    return flags;
+  }
+
+  return flags;
 }
 
 QVariant
@@ -205,16 +256,16 @@ MultiChannelTreeModel::headerData(
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
     switch (section) {
-      case 0:
+      case ZMQ_TREEMODEL_COL_NAME:
         return "Name";
 
-      case 3:
+      case ZMQ_TREEMODEL_COL_FREQUENCY:
         return "Frequency";
 
-      case 1:
+      case ZMQ_TREEMODEL_COL_BANDWIDTH:
         return "Rate";
 
-      case 2:
+      case ZMQ_TREEMODEL_COL_TYPE:
         return "Modulation";
     }
   }
@@ -283,5 +334,5 @@ MultiChannelTreeModel::columnCount(const QModelIndex &) const
   // 3. Bandwidth
   // 4. Modulation
 
-  return 4;
+  return ZMQ_TREEMODEL_COUNT;
 }

@@ -52,6 +52,7 @@ struct ChannelDescription {
   std::string    name;
   SUFREQ         offset;
   SUFLOAT        bandwidth;
+  bool           enabled = true;
 
   SUFLOAT        sampRate;
   std::string    inspClass;
@@ -77,6 +78,7 @@ struct MasterChannel {
   std::string    name;
   SUFREQ         frequency;
   SUFLOAT        bandwidth;
+  bool           enabled = true;
 
   std::list<ChannelDescription> channels;
   MasterListIterator  iter;

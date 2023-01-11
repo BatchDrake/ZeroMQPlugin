@@ -89,6 +89,9 @@ namespace SigDigger {
 
     void refreshUi();
 
+    void colorizeMaster(std::string const &, NamedChannelSetIterator &);
+    void colorizeChannel(std::string const &, NamedChannelSetIterator &);
+
     void doRemoveMaster(MasterChannel *);
     void doRemoveChannel(ChannelDescription *);
 
@@ -155,6 +158,11 @@ namespace SigDigger {
 
     void onOpenSettings();
     void onSaveSettings();
+
+    void onDataChanged(
+        const QModelIndex &topLeft,
+        const QModelIndex &bottomRight,
+        const QList<int> &roles = QList<int>());
   };
 }
 

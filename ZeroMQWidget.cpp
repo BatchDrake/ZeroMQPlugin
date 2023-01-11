@@ -275,7 +275,67 @@ ZeroMQWidget::connectAll()
         SIGNAL(toggled(bool)),
         this,
         SLOT(onToggleTrackTuner()));
+
+  connect(
+        m_treeModel,
+        SIGNAL(dataChanged(QModelIndex,QModelIndex,QList<int>)),
+        this,
+        SLOT(onDataChanged(QModelIndex,QModelIndex,QList<int>)));
 }
+
+void
+ZeroMQWidget::colorizeMaster(
+    std::string const &name,
+    NamedChannelSetIterator &it)
+{
+  // Verify state of this master:
+  MasterChannel *master = m_forwarder->findMaster(name.c_str());
+  NamedChannel *namCh   = it.value();
+  QColor color;
+
+  if (master != nullptr) {
+    bool opened = master->handle != SUSCAN_INVALID_HANDLE_VALUE;
+
+    if (!master->enabled) {
+      color = opened ? QColor(0, 127, 0) : QColor(127, 127, 127);
+    } else {
+      color = opened ? QColor(0, 255, 0) : QColor(255, 255, 255);
+    }
+  } else {
+    color = QColor(127, 127, 127);
+  }
+
+  namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
+
+  m_spectrum->refreshChannel(it);
+}
+
+void
+ZeroMQWidget::colorizeChannel(
+    std::string const &name,
+    NamedChannelSetIterator &it)
+{
+  // Verify state of this master:
+  ChannelDescription *chan = m_forwarder->findChannel(name.c_str());
+  NamedChannel *namCh   = it.value();
+  QColor color;
+
+  if (chan != nullptr) {
+    bool opened = chan->handle != SUSCAN_INVALID_HANDLE_VALUE;
+
+    if (!chan->enabled || !chan->parent->enabled)
+      color = opened ? QColor(127, 82, 0) : QColor(100, 100, 100);
+    else
+      color = opened ? QColor(255, 165, 0) : QColor(200, 200, 200);
+  } else {
+    color = QColor(127, 127, 127);
+  }
+
+  namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
+
+  m_spectrum->refreshChannel(it);
+}
+
 
 void
 ZeroMQWidget::refreshUi()
@@ -305,45 +365,11 @@ ZeroMQWidget::refreshUi()
   m_ui->togglePublishingButton->setText(text);
   m_ui->togglePublishingButton->setStyleSheet(style);
 
-  for (auto p = m_masterMarkers.begin(); p != m_masterMarkers.end(); ++p) {
-    // Verify state of this master:
-    MasterChannel *master = m_forwarder->findMaster(p->first.c_str());
-    NamedChannelSetIterator it = p->second;
-    NamedChannel *namCh   = it.value();
-    QColor color;
+  for (auto p = m_masterMarkers.begin(); p != m_masterMarkers.end(); ++p)
+    colorizeMaster(p->first, p->second);
 
-    if (master != nullptr) {
-      bool opened = master->handle != SUSCAN_INVALID_HANDLE_VALUE;
-
-      color = opened ? QColor(0, 255, 0) : QColor(255, 255, 255);
-    } else {
-      color = QColor(127, 127, 127);
-    }
-
-    namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
-
-    m_spectrum->refreshChannel(it);
-  }
-
-  for (auto p = m_channelMarkers.begin(); p != m_channelMarkers.end(); ++p) {
-    // Verify state of this master:
-    ChannelDescription *chan = m_forwarder->findChannel(p->first.c_str());
-    NamedChannelSetIterator it = p->second;
-    NamedChannel *namCh   = it.value();
-    QColor color;
-
-    if (chan != nullptr) {
-      bool opened = chan->handle != SUSCAN_INVALID_HANDLE_VALUE;
-
-      color = opened ? QColor(255, 165, 0) : QColor(200, 200, 200);
-    } else {
-      color = QColor(127, 127, 127);
-    }
-
-    namCh->cutOffColor = namCh->markerColor = namCh->boxColor = color;
-
-    m_spectrum->refreshChannel(it);
-  }
+  for (auto p = m_channelMarkers.begin(); p != m_channelMarkers.end(); ++p)
+    colorizeChannel(p->first, p->second);
 }
 
 void
@@ -1010,3 +1036,34 @@ ZeroMQWidget::onURLChanged()
 {
   m_panelConfig->zmqURL = m_ui->urlEdit->text().toStdString();
 }
+
+void
+ZeroMQWidget::onDataChanged(
+    const QModelIndex &topLeft,
+    const QModelIndex &,
+    const QList<int> &)
+{
+  if (topLeft.isValid()) {
+    MultiChannelTreeItem *item = MultiChannelTreeModel::indexData(topLeft);
+
+    if (item->type == MULTI_CHANNEL_TREE_ITEM_MASTER) {
+      auto it = m_masterMarkers.find(item->master->name);
+      if (it != m_masterMarkers.end()) {
+        colorizeMaster(it->first, it->second);
+
+        for (auto p = item->master->channels.begin();
+             p != item->master->channels.end();
+             ++p) {
+          auto it = m_channelMarkers.find(p->name);
+          if (it != m_channelMarkers.end())
+            colorizeChannel(it->first, it->second);
+        }
+      }
+    } else if (item->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL) {
+      auto it = m_channelMarkers.find(item->channel->name);
+      if (it != m_channelMarkers.end())
+        colorizeChannel(it->first, it->second);
+    }
+  }
+}
+
