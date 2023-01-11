@@ -132,7 +132,7 @@ MultiChannelTreeModel::data(const QModelIndex &index, int role) const
         bool enabled = false;
 
         if (item->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
-          enabled = item->channel->enabled;
+          enabled = item->channel->consumer->isEnabled();
         else if (item->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
           enabled = item->master->enabled;
 
@@ -220,7 +220,7 @@ MultiChannelTreeModel::setData(const QModelIndex &index, const QVariant &value, 
       bool enabled = value.value<Qt::CheckState>() == Qt::CheckState::Checked;
 
       if (childItem->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL)
-        childItem->channel->enabled = enabled;
+        childItem->channel->consumer->setEnabled(enabled);
       else if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
         childItem->master->setEnabled(enabled);
 
@@ -243,10 +243,13 @@ MultiChannelTreeModel::flags(const QModelIndex &index) const
         index.internalPointer());
 
   if (index.column() == ZMQ_TREEMODEL_COL_NAME) {
-    flags |= Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
+    flags |= Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
 
     if (childItem->type == MULTI_CHANNEL_TREE_ITEM_MASTER)
-      flags |= Qt::ItemIsAutoTristate;
+      flags |= Qt::ItemIsAutoTristate | Qt::ItemIsEnabled;
+    else if (childItem->type == MULTI_CHANNEL_TREE_ITEM_CHANNEL
+             && childItem->channel->parent->enabled)
+      flags |= Qt::ItemIsEnabled;
 
     return flags;
   }

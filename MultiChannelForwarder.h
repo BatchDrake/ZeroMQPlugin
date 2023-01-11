@@ -30,6 +30,8 @@ struct ChannelDescription;
 class MultiChannelForwarder;
 
 class ChannelConsumer {
+  bool m_enabled = true;
+
 public:
   virtual void opened(
       Suscan::Analyzer *,
@@ -38,6 +40,11 @@ public:
       Suscan::Config const &) = 0;
   virtual void samples(const SUCOMPLEX *, SUSCOUNT) = 0;
   virtual void closed() = 0;
+  virtual void enableStateChanged(bool) = 0;
+
+  void setEnabled(bool);
+  bool isEnabled() const;
+
   virtual ~ChannelConsumer();
 };
 
@@ -53,7 +60,6 @@ struct ChannelDescription {
   std::string    name;
   SUFREQ         offset;
   SUFLOAT        bandwidth;
-  bool           enabled = true;
 
   SUFLOAT        sampRate;
   std::string    inspClass;

@@ -23,6 +23,22 @@
 #include <string>
 #include <cstdio>
 
+void
+ChannelConsumer::setEnabled(bool enabled)
+{
+  if (m_enabled != enabled) {
+    m_enabled = enabled;
+    enableStateChanged(enabled);
+  }
+}
+
+bool
+ChannelConsumer::isEnabled() const
+{
+  return m_enabled;
+}
+
+
 ChannelConsumer::~ChannelConsumer()
 {
 }

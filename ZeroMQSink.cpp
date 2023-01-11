@@ -173,8 +173,10 @@ ZeroMQConsumer::opened(
   QString fileString;
   std::string file;
 
-  m_topic = channel.name;
-
+  m_topic    = channel.name;
+  m_config   = config;
+  m_analyzer = analyzer;
+  m_handle   = handle;
 
   if (channel.inspClass == "raw") {
     m_sampRate = channel.sampRate;
@@ -182,25 +184,26 @@ ZeroMQConsumer::opened(
     SUFREQ f_edge;
     SUFLOAT bw_new = m_sampRate * .5;
     Suscan::AnalyzerSourceInfo info = analyzer->getSourceInfo();
-    Suscan::Config newConfig(config.getInstance());
     uint64_t demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_DISABLED;
     // Audio inspector. In this case, we need to configure the appropriate
     // demodulator accordingly
 
-    newConfig.set("audio.sample-rate", static_cast<uint64_t>(m_sampRate));
-    newConfig.set("audio.cutoff", static_cast<SUFLOAT>(bw_new));
-    newConfig.set("audio.volume", 1.f);
+    m_config.set("audio.sample-rate", static_cast<uint64_t>(m_sampRate));
+    m_config.set("audio.cutoff", static_cast<SUFLOAT>(bw_new));
+    m_config.set("audio.volume", 1.f);
 
-    if (m_channelType == "audio:fm")
-      demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_FM;
-    else if (m_channelType == "audio:am")
-      demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_AM;
-    else if (m_channelType == "audio:usb")
-      demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_USB;
-    else if (m_channelType == "audio:lsb")
-      demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_LSB;
+    if (isEnabled()) {
+      if (m_channelType == "audio:fm")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_FM;
+      else if (m_channelType == "audio:am")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_AM;
+      else if (m_channelType == "audio:usb")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_USB;
+      else if (m_channelType == "audio:lsb")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_LSB;
+    }
 
-    newConfig.set("audio.demodulator", demod);
+    m_config.set("audio.demodulator", demod);
 
 
     // We need to improve filtering, so this is what we will do:
@@ -217,18 +220,18 @@ ZeroMQConsumer::opened(
 
     if (demod == SUSCAN_INSPECTOR_AUDIO_DEMOD_USB) {
       f_edge = channel.offset - channel.bandwidth / 2;
-      analyzer->setInspectorFreq(handle, f_edge + bw_new / 2);
-      analyzer->setInspectorBandwidth(handle, bw_new);
+      m_analyzer->setInspectorFreq(m_handle, f_edge + bw_new / 2);
+      m_analyzer->setInspectorBandwidth(m_handle, bw_new);
     } else if (demod == SUSCAN_INSPECTOR_AUDIO_DEMOD_LSB) {
       f_edge = channel.offset + channel.bandwidth / 2;
-      analyzer->setInspectorFreq(handle, f_edge - bw_new / 2);
-      analyzer->setInspectorBandwidth(handle, bw_new);
+      m_analyzer->setInspectorFreq(m_handle, f_edge - bw_new / 2);
+      m_analyzer->setInspectorBandwidth(m_handle, bw_new);
     }
 
     // As soon as we start to receive samples, we now we were on the right
     // track, no need to track this request.
-    analyzer->setInspectorConfig(handle, newConfig);
-    analyzer->setInspectorWatermark(handle, calcBufLen());
+    m_analyzer->setInspectorConfig(m_handle, m_config);
+    m_analyzer->setInspectorWatermark(m_handle, calcBufLen());
   }
 
   fileString = QString::fromStdString(m_channelType) + "_" + QString::number(m_sampRate) + ".raw";
@@ -256,5 +259,28 @@ ZeroMQConsumer::closed()
   if (m_fp != nullptr)
     fclose(m_fp);
 
+  m_analyzer = nullptr;
   m_fp = nullptr;
+}
+
+void
+ZeroMQConsumer::enableStateChanged(bool state)
+{
+  if (m_analyzer != nullptr) {
+    uint64_t demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_DISABLED;
+
+    if (state) {
+      if (m_channelType == "audio:fm")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_FM;
+      else if (m_channelType == "audio:am")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_AM;
+      else if (m_channelType == "audio:usb")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_USB;
+      else if (m_channelType == "audio:lsb")
+        demod = SUSCAN_INSPECTOR_AUDIO_DEMOD_LSB;
+    }
+
+    m_config.set("audio.demodulator", demod);
+    m_analyzer->setInspectorConfig(m_handle, m_config);
+  }
 }

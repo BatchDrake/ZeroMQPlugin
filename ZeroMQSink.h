@@ -59,7 +59,9 @@ class ZeroMQConsumer : public ChannelConsumer
   ZeroMQSink *m_zmq_sink = nullptr;
   ZeroMQDeliveryMask m_mask;
   FILE *m_fp = nullptr;
-
+  Suscan::Config m_config;
+  Suscan::Analyzer *m_analyzer;
+  Suscan::Handle m_handle;
   unsigned int calcBufLen() const;
 
 public:
@@ -74,6 +76,7 @@ public:
       Suscan::Config const &) override;
   virtual void samples(const SUCOMPLEX *, SUSCOUNT) override;
   virtual void closed() override;
+  virtual void enableStateChanged(bool) override;
 
   virtual ~ZeroMQConsumer();
 };

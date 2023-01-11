@@ -323,7 +323,7 @@ ZeroMQWidget::colorizeChannel(
   if (chan != nullptr) {
     bool opened = chan->handle != SUSCAN_INVALID_HANDLE_VALUE;
 
-    if (!chan->enabled || !chan->parent->enabled)
+    if (!chan->consumer->isEnabled() || !chan->parent->enabled)
       color = opened ? QColor(127, 82, 0) : QColor(100, 100, 100);
     else
       color = opened ? QColor(255, 165, 0) : QColor(200, 200, 200);
