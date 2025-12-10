@@ -1,4 +1,5 @@
-QT += core widgets gui
+QT += core gui network widgets opengl
+greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 
 TEMPLATE = lib
 DEFINES += ZEROMQPLUGIN_LIBRARY
